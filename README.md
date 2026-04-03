@@ -27,7 +27,7 @@ I am trying to negotiate with Waveshare to make a high-NIT board available. At t
 - A Waveshare ESP32-S3-Touch-LCD-4 Version 4 board. I have also provided a flash file for V3 boards, but not the source files. I can provide the V3 source files, but some functionality is not available on V3 boards: there is no backlight control, and powering up the board is not automatic because you have to use the power key. Please send me a message if you need the Version 3 source files.
 - An NMEA2000 cable that is compatible with your boat network (in my case, a Raymarine SPUR cable).
 
-# You can donate at the top of the github page by clicking the SPONSOR button if you appreciate this program and to help me with my work
+## You can donate at the top of the github page by clicking the SPONSOR button if you appreciate this program and to help me with my work
 
 ## Some screenshots
 
