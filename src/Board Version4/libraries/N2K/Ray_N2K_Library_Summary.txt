@@ -1,0 +1,294 @@
+Ray_N2K Library Summary (ESP32 / Arduino / NMEA 2000 / Raymarine EVO Autopilot)
+=============================================================================
+
+1) What this library is
+-----------------------
+Ray_N2K is a small wrapper around Timo Lappalainen’s Arduino NMEA2000 stack.
+It provides:
+  - A single NMEA2000 message handler that decodes a fixed set of PGNs
+  - Public “ready-to-use” values as floats/ints (heading, wind, nav, etc.)
+  - Optional exponential smoothing (EMA) for noisy values
+  - Timeout logic: values become stale (NAN / invalid) if not updated recently
+  - Raymarine EVO autopilot helpers (read mode + setpoint, send mode/commands)
+
+Typical usage is:
+  - Configure your CAN interface and the tNMEA2000 object in your sketch
+  - Call N2K::setup(bus) OR N2K::attach(bus)
+  - Call N2K::process(bus) frequently in loop() to drain the N2K receive queue
+  - Read values from the N2K namespace (e.g. N2K::hdgTrueSmoothed() / N2K::hdgMagSmoothed())
+
+
+2) Underlying libraries and key types
+-------------------------------------
+Ray_N2K depends on:
+
+  A) Timo Lappalainen’s NMEA2000 library
+     - tNMEA2000 (bus object)
+     - tN2kMsg (N2K message container)
+     - ParseN2kXXXX helper functions to decode standard PGNs
+     - N2kIsNA() for “not available” values
+
+  B) A CAN driver appropriate for your ESP32 board
+     - On ESP32 this is usually NMEA2000_esp32 (TWAI) or similar integration.
+
+  C) Arduino core
+     - millis(), NAN, Serial, math functions, etc.
+
+Important: all angle values in standard ParseN2k… routines are typically returned
+in radians (or degrees for latitude/longitude), and Ray_N2K converts them to a
+convenient public format (usually degrees and knots).
+
+
+3) Architecture: handler + storage + timeout/smoothing
+------------------------------------------------------
+
+3.1 Message reception
+Ray_N2K registers a message handler (HandleMsg) and a “receive PGN list” so the
+NMEA2000 library only forwards PGNs we care about.
+
+In N2K::process(bus):
+  - bus.ParseMessages() is called
+  - Each received PGN is passed to HandleMsg(const tN2kMsg& m)
+
+3.2 Storage model
+For each value the module typically keeps:
+  - A “smoothed/EMA internal” variable (…E) OR a circular EMA helper for angles
+  - A “published snapshot” variable (…S) that users read
+  - A timestamp tXXXX (millis) of last update
+
+3.3 Staleness / timeout
+A global TIMEOUT_MS defines how long a value is considered “fresh” after the last
+update. Once (millis() - tXXXX) > TIMEOUT_MS, the getter returns NAN (or invalid).
+This prevents using old data when the N2K sender disappears.
+
+3.4 Smoothing
+Most dynamic sensor values are low-pass filtered with EMA, for example:
+  AWS/TWS, SOG/STW, rudder angle, COG/HDG (as angles).
+
+For angles there is special “circular” smoothing to handle wrap-around at 360°.
+Otherwise averaging 359° and 1° would incorrectly become 180°.
+
+Note on setpoints: in the “latest working variant” discussed in this project,
+the autopilot setpoints (locked heading and wind datum) are treated as setpoints
+and should not be additionally smoothed (so UI feedback is immediate).
+
+
+4) Public values (what you can read)
+------------------------------------
+The library exposes values like:
+
+  Wind:
+    - AWS (knots), AWA (deg 0..360)  [apparent wind]
+    - TWS (knots), TWA (deg 0..360)  [true wind]
+  Navigation / motion:
+    - HDG (deg), COG (deg), SOG (knots), STW (knots)
+    - Depth (m)
+    - Latitude/Longitude (degrees)
+  Steering:
+    - Rudder angle (deg)
+  Route navigation:
+    - XTC (cross track error) in nautical miles (signed or unsigned depending on config)
+    - DTW (distance to waypoint) in nautical miles
+    - BTW (bearing to waypoint / bearing position-to-destination) in degrees
+    - ETW (estimated time to waypoint) as day/hour/min (derived)
+
+Autopilot (Raymarine-specific):
+    - apMode() -> STANDBY / AUTO / WIND / TRACK / UNKNOWN
+    - apHeadingTarget() -> locked heading setpoint (deg)
+    - apWindAngleTarget() -> wind datum setpoint (typically displayed as -180..+180)
+
+
+5) Autopilot control (what you can send)
+----------------------------------------
+Ray_N2K contains a RaymarinePilot helper (Raymarine proprietary behavior).
+It supports sending commands to the pilot via NMEA2000, but this is NOT standard
+NMEA2000. The rule is: it works for Raymarine EVO pilots because they speak a
+Raymarine / “Seatalk over N2K” dialect.
+
+Key ideas:
+  - The autopilot has a N2K “source address” on the bus.
+  - The library learns PilotSourceAddress from received pilot PGNs.
+  - Outgoing command messages are unicast to that PilotSourceAddress.
+
+Commands supported:
+  - Set Mode (STANDBY / AUTO / WIND / TRACK) via PGN 126208 (Raymarine format)
+  - Adjust course in AUTO/TRACK (“+1/-1/+10/-10”) via PGN 126208 course command
+  - In WIND mode, adjust wind datum.
+    In early versions this used “keypress emulation” via PGN 126720.
+    In the improved version it uses RaymarinePilot::SetEvoPilotWind (PGN 126208)
+    to directly command a wind target.
+
+Implementation notes from Ray_N2K.cpp:
+  - RaymarinePilot::SetEvoPilotMode uses PGN 126208 with a fixed byte payload
+    and two bytes that encode mode/submode (00 00 standby, 40 00 auto, 00 01 wind,
+    80 01 track).
+  - RaymarinePilot::SetEvoPilotCourse uses PGN 126208 and encodes heading & delta.
+  - RaymarinePilot::SetEvoPilotWind uses PGN 126208 and encodes targetWindDirection
+    scaled by 10000 (units are Raymarine-specific).
+  - RaymarinePilot::KeyCommand uses PGN 126720 with a “magic” byte pattern and 2-byte
+    keycode inserted (used by some setups for +/- keys, tack, etc.).
+
+
+6) PGNs used by this library (and which fields matter)
+------------------------------------------------------
+The receive PGN list includes:
+
+Standard NMEA2000 PGNs:
+  - 127250 (Vessel Heading)
+      ParseN2kHeading(): heading (rad), deviation (rad), variation (rad), reference
+      Library uses heading for HDG and variation for MAG.
+
+  - 127258 (Magnetic Variation)
+      ParseN2kMagneticVariation(): src, age, variation (rad)
+      Library uses variation (deg). (Often duplicates 127250 variation.)
+
+  - 129026 (COG & SOG, Rapid Update)
+      ParseN2kCOGSOGRapid(): COG (rad), SOG (m/s), ref
+      Library stores COG (deg), SOG (kn).
+
+  - 128259 (Boat Speed)
+      ParseN2kBoatSpeed(): water speed (m/s), ground speed (m/s), ref type
+      Library uses the water speed and stores STW (kn).
+
+  - 128267 (Water Depth)
+      ParseN2kWaterDepth(): depth (m), offset (m)
+      Library stores depth (m).
+
+  - 130306 (Wind Data)
+      ParseN2kWindSpeed(): wind speed (m/s), wind angle (rad), reference
+      Library stores AWS/AWA if reference is apparent, else TWS/TWA.
+
+  - 129025 (Position, Rapid Update)
+      ParseN2kPositionRapid(): latitude (deg), longitude (deg)
+      Library stores LAT/LON.
+
+  - 129029 (GNSS Position Data)
+      ParseN2kGNSS(): many fields (time, fix, dop, etc.) incl latitude/longitude
+      Library uses LAT/LON as a fallback/alternative source.
+
+  - 127245 (Rudder)
+      ParseN2kRudder(): rudder position (rad) or angle order (rad)
+      Library stores rudder angle in degrees.
+
+Route navigation:
+  - 129283 (Cross Track Error)
+      ParseN2kXTE(): mode, navTerminated, XTE (meters)
+      Library converts meters to NM and stores XTC.
+
+  - 129284 (Navigation Data / Navigation Info)
+      ParseN2kNavigationInfo(): distance to dest (m), bearing (rad), ETA date/time,
+                               destination WP IDs, dest lat/lon, closing velocity (m/s), etc.
+      Library uses:
+        * dist_m -> DTW in NM
+        * brgPos -> BTW in degrees
+        * closing_ms + dist_m -> ETW (computed time-to-go)
+      Note: “ETW” here is computed as dist/closing_speed; it is NOT the GNSS ETA date/time.
+
+
+Raymarine proprietary PGNs (EVO autopilot):
+  - 65379 (Raymarine Pilot Mode / State)
+      RaymarinePilot::ParseN2kPGN65379(): Mode, Submode bytes
+      Library maps (Mode,Submode) to ApMode:
+        standby / auto / wind / track.
+
+  - 65360 (Raymarine Pilot Locked Heading)
+      RaymarinePilot::ParseN2kPilotLockedHeading(): HeadingTrue, HeadingMagnetic (rad)
+      Library uses magnetic heading if available; converts to deg for apHeadingTarget.
+
+  - 65345 (Raymarine Pilot Wind Datum)
+      RaymarinePilot::ParseN2kPilotWindAngle(): WindAngle, RollingAverageWindAngle (rad)
+      Library’s intent is:
+        * WindAngle = wind datum (setpoint)
+        * RollingAverageWindAngle = “actual” wind angle (smoothed)
+      In early versions, the code incorrectly preferred the rolling-average field,
+      which made it look like live AWA rather than a stable setpoint.
+      The corrected behavior is to prefer WindAngle for the setpoint.
+
+
+7) Known issues / limitations / “gotchas”
+-----------------------------------------
+
+7.1 Proprietary Raymarine behavior (biggest item)
+Autopilot control and some autopilot setpoint data rely on Raymarine proprietary
+encodings (PGN 126208, 126720, 65345/65360/65379). These are not official NMEA2000
+standard definitions. They can vary between firmware versions and products.
+If something doesn’t work on a given system, bus captures/sniffing may be required.
+
+7.2 Wind datum reference & sign conventions
+Even when using the correct PGN/field for wind datum (65345 wind datum), some systems
+show a consistent discrepancy on port tack compared to ST70 displays. This suggests
+Raymarine’s on-screen “wind angle” may apply additional internal transformations.
+Practical workaround: map the value into [-180,+180] for display and, if needed,
+apply a tack-dependent adjustment based on real-world calibration/tests.
+
+7.3 MAX precision vs printing
+Latitude/Longitude are stored as floating point degrees. If you only see “2 decimals”
+on Serial, it’s usually a printing format issue (Serial.print defaults to 2 decimals
+unless you specify precision). Use Serial.print(lat, 6) etc.
+
+7.4 Float precision
+Some values are stored as float for convenience. For position this is normally fine for
+typical marine displays; GNSS internally has higher precision than float can represent.
+If you need maximum precision, store latitude/longitude as double and print with more
+digits (ESP32 uses 64-bit double, but Arduino printing/formatting still matters).
+
+7.5 Timing / UI starvation (ESP32 + LVGL)
+If your UI task (e.g. LVGL full refresh, image rotation) runs at too high priority or
+does too much work, it can starve the NMEA2000 message loop, causing missed/late pilot
+mode updates. Best practice:
+  - Keep N2K::process(bus) extremely fast and frequent
+  - Move UI updates to the LVGL task/timer
+  - Ensure LVGL task priority does not starve the N2K loop
+
+7.6 “ETW” semantics
+The library computes ETW from distance and closing speed (dist/closing), and exposes it as
+days/hours/minutes. This is “time-to-go”, not necessarily the same as “ETA at waypoint”.
+If you want actual ETA, use ETA date/time fields from PGN 129284 (etaDate, etaTime).
+
+7.7 Bus mode (listen-only vs talker)
+Ray_N2K setup is often configured in listen-only mode to avoid interfering with other devices.
+However, autopilot commands require the node to be able to transmit.
+If you can read but cannot control the pilot, verify bus mode and device configuration.
+
+
+8) How to extend the library (developer notes)
+----------------------------------------------
+
+8.1 Add a new PGN to decode
+  - Add the PGN to RxPGNs[]
+  - Add a “case <PGN>UL:” handler in HandleMsg()
+  - Use the appropriate ParseN2k… helper (for standard PGNs) OR implement a parser
+    if it is proprietary.
+  - Choose units and conversion:
+      radians -> degrees (RAD_TO_DEG), meters -> NM (M_TO_NM), m/s -> kn (MS_TO_KNOTS)
+  - Add storage vars (…E/…S) + timestamp tXXXX
+  - Add getters and hasFresh… helpers
+
+8.2 Dealing with angles
+  - Use wrap360() before storage
+  - If smoothing, use circular EMA like the existing AWA/TWA/COG/HDG code
+
+8.3 Keep handlers non-blocking
+  - Never do heavy Serial printing inside HandleMsg() (it causes timing issues)
+  - Avoid any dynamic memory allocation in the fast path if possible
+
+8.4 Autopilot feature development
+  - First: verify reading (mode + setpoints) is stable
+  - Second: confirm PilotSourceAddress is learned
+  - Third: test command PGNs with careful safety measures (on dock, slow speed)
+  - For new Raymarine commands: capture bus traffic from real Raymarine head units
+    and compare bytes (especially for PGN 126208 payloads)
+
+
+Appendix: quick glossary
+------------------------
+HDG: heading (compass heading)
+COG: course over ground
+SOG: speed over ground
+STW: speed through water
+AWS/AWA: apparent wind speed/angle
+TWS/TWA: true wind speed/angle
+XTC (XTE): cross track error
+DTW: distance to waypoint
+BTW: bearing to waypoint
+ETW: estimated time to waypoint (time-to-go)

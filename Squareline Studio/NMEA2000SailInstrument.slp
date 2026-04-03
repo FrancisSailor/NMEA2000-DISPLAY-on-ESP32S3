@@ -1,0 +1,12 @@
+{
+    "uiExportFolderPath": "/home/francis/Programs/Squareline Studio/examples/NMEA2000Sailinstrument/UI files",
+    "projectExportFolderPath": "/home/francis/Programs/Squareline Studio/examples/NMEA2000Sailinstrument",
+    "drive_stdio": "-",
+    "drive_stdio_path": "",
+    "drive_posix": "-",
+    "drive_posix_path": "",
+    "drive_win32": "-",
+    "drive_win32_path": "",
+    "drive_fatfs": "F",
+    "drive_fatfs_path": "F:/"
+}

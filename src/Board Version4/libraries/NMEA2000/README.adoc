@@ -1,0 +1,42 @@
+= NMEA2000 library for C++ =
+
+image:https://github.com/phatpaul/NMEA2000/actions/workflows/compile-examples-arduino-esp32-v1.yml/badge.svg[title=Compiles on ESP32-Arduino-v1,link=https://github.com/phatpaul/NMEA2000/actions/workflows/compile-examples-arduino-esp32-v1.yml]
+image:https://github.com/phatpaul/NMEA2000/actions/workflows/compile-examples-arduino-esp32-v2.yml/badge.svg[title=Compiles on ESP32-Arduino-v2,link=https://github.com/phatpaul/NMEA2000/actions/workflows/compile-examples-arduino-esp32-v2.yml]
+image:https://github.com/phatpaul/NMEA2000/actions/workflows/unit-tests.yml/badge.svg[title=Unit Tests,link=https://github.com/phatpaul/NMEA2000/actions/workflows/unit-tests.yml]
+
+NMEA2000 library is object oriented C++ library for developing NMEA2000 bus devices. Library fulfills automatically NMEA 2000 mandatory requirements leaving only interesting data handling for developer.  ** Library has been used in several commercial certified NMEA2000 devices. **
+
+Library provides you easy way to make different kind of NMEA2000 bus devices like sensor transducers (battery, temperature, wind, engine, etc.), NMEA2000 information displays,NMEA2000->PC interface (like Actisense NGT1), NMEA0183->NMEA2000 or NMEA2000->NMEA0183 converter.
+
+Library has been originally (2015) developed for Arduino based boards. As far as I know it has been used and tested with Teensy, ESP, some Arduino, MBED and Rasberry Boards, but library can be used also in other systems by writing compatible CAN "driver" and necessary classes for other hw specific functions.
+
+If you are familiar with library, here is quick link to the changes: 
+https://ttlappalainen.github.io/NMEA2000/changes.html
+
+Read more from the full documentation on Github Pages: 
+https://ttlappalainen.github.io/NMEA2000/index.html
+
+
+== License ==
+
+MIT license
+
+Copyright (c) 2015-2024 Timo Lappalainen, Kave Oy, www.kave.fi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

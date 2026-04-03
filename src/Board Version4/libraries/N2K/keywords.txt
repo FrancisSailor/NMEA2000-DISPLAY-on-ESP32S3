@@ -1,0 +1,2 @@
+N2K	KEYWORD1
+apSetModeAuto	KEYWORD2

@@ -1,0 +1,16 @@
+{
+  "codename": "Arial60",
+  "ttf_path": "/assets/Arial Black.ttf",
+  "bin_path": "/assets\\ui_font_Arial60.bin",
+  "c_path": "/assets\\ui_font_Arial60.c",
+  "cfg_path": "/assets\\ui_font_Arial60.fcfg",
+  "size": 60,
+  "bpp": 1,
+  "letters": 3,
+  "ranges": [
+    "0x20-0xff"
+  ],
+  "symbols": "",
+  "customparams": "--no-compress --no-prefilter",
+  "uploaded": false
+}
