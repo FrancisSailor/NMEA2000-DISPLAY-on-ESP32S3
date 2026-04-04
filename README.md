@@ -33,11 +33,7 @@ This project was created as an affordable replacement for a failing **Raymarine 
 
 ## Screenshots
 
-### Main screens
-
 ![Overview of the NMEA2000 display screens](images/screenshots-overview.png)
-
-### Settings and AWA screen
 
 ![Settings and apparent wind angle screen](images/settings-and-awa.png)
 
