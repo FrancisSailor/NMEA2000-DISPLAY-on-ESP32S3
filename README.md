@@ -1,4 +1,4 @@
-# NMEA2000 Display with Autopilot and Alarm Handling
+# ESP32-S3 based NMEA2000 Display with Autopilot and Alarm Handling
 
 Based on work by Homberger and Timo Lappalainen.
 
