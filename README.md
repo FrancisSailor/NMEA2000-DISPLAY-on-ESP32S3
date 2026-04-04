@@ -160,7 +160,7 @@ The full SquareLine project is in the `Squareline` folder. If you modify the Squ
 
 ## Housing
 
-There is also a folder for the housing, with the FreeCAD files. The housing was designed with FreeCAD 1.0, but the files are compatible with version 1.1. Files you can use directly for your 3D printer are also included in this folder.
+There is also a folder for the housing, with the FreeCAD files. The housing was designed with FreeCAD 1.0, but the files are compatible with version 1.1. Files you can use directly for your 3D printer are also included in this folder. There are mounting holes for mounting the display with small 2,5 mm screws, but i noticed it is very easy to crack the glass of the LCD if you tension even only a litle bit too much the screws. I now glue the display in place, which is safer.
 
 ## Hardware connections
 
