@@ -1,286 +1,277 @@
-# NMEA2000 Display for ESP32-S3
+# NMEA2000 Display with Autopilot and Alarm Handling
 
-DIY **NMEA2000 marine display** for the **Waveshare ESP32-S3-Touch-LCD-4**, with **Raymarine EVO autopilot support**, **alarm acknowledgement**, touch UI, and a 3D-printable housing.
+Based on work by Homberger and Timo Lappalainen.
 
-Based on the work of **Homberger** and **[Timo Lappalainen](https://github.com/ttlappalainen)**.
+A DIY NMEA2000 display for the Waveshare ESP32-S3-Touch-LCD-4, with autopilot support, alarm handling, and a touchscreen user interface designed as an affordable replacement for older marine displays such as the Raymarine ST70.
 
-If this project helps you, you can support it here: **[Buy Me a Coffee](https://buymeacoffee.com/francissailor)**
+> **☕ If this project helps you, you're welcome to support it here:** [Buy Me a Coffee](https://buymeacoffee.com/francissailor)  
+> Even a small contribution helps me keep improving the project.
 
----
+## What to Expect
 
-## Overview
-
-This project was created as an affordable replacement for a failing **Raymarine ST70** display. The goal was to build a practical NMEA2000 display that is easy to assemble, useful on board, and does **not** require a custom PCB or soldering.
-
-### Highlights
-
-- Fully working **NMEA2000 display** for marine instruments
-- **Raymarine EVO autopilot** support and autopilot mode display
-- **Autopilot alarm handling** with alarm acknowledgement
-- **No soldering required**: only 4 wire connections
-- Touch-based settings screen with unit selection
+- A fully working NMEA2000 display comparable to some commercial displays
+- No soldering required: just connect the NMEA2000 wires and the power wires to the terminal block
+- A 3D-printable housing with the same mounting-hole pattern as an ST70 instrument
+- Compatibility with Raymarine Evolution autopilot modes
+- Display and acknowledgement of autopilot-related alarms
+- Configurable units (knots, km/h, m/s, ft, m, and more) through a settings screen
 - Settings stored in flash memory
-- 3D-printable housing with **ST70-compatible mounting holes**
 
-### Limitations
+## What Not to Expect
 
-- Display brightness is about **350 nits**, so it is **not ideal for outdoor sunlight**
-- The hardware is **not ruggedized for exposed outdoor use**
-- The housing is **not waterproof**
-- Best suited for **indoor or protected cockpit installation**
+- The display is **not bright enough for comfortable outdoor use** in full sun (about 350 nits)
+- The display is **not ruggedized** for outdoor use
+- The housing is **not watertight** and is not designed for outdoor exposure
 
----
+I am still hoping that Waveshare will eventually offer a higher-brightness version of this board. If that would also help your use case, please consider asking them for a high-nit version of the **ESP32-S3-Touch-LCD-4** through their support page on the Waveshare wiki.
+
+## Hardware Required
+
+- **Waveshare ESP32-S3-Touch-LCD-4, Version 4**
+- An **NMEA2000 cable** compatible with your boat network  
+  In my case, I used a **Raymarine Spur cable**
+
+### Note on Version 3 boards
+
+I have included a flash file for Version 3 boards, but not the full source package. I can provide the Version 3 source files on request. Some functionality is limited on Version 3 boards:
+
+- No backlight control
+- Power-up is not automatic; you need to use the power key
 
 ## Screenshots
 
-![Overview of the NMEA2000 display screens](images/screenshots-overview.png)
+<p>
+  <img src="images/screenshots-page2.png" alt="Main screenshots of the display" width="850">
+</p>
 
-![Settings and apparent wind angle screen](images/settings-and-awa.png)
+<p>
+  <img src="images/screenshots-page3.png" alt="Settings and apparent wind angle screenshots" width="850">
+</p>
 
-> These are screenshots, not live animated screens with real-time NMEA2000 values.
+*These are screenshots, so they are not animated and do not show live NMEA2000 values.*
 
----
+## Why I Built This
 
-## Hardware required
+My Raymarine ST70 display was no longer functioning correctly. Replacing it with a new one would have cost roughly **€500 to €600**, so I started looking for an alternative. In the end, the only affordable option was to build and program it myself.
 
-### Required parts
+My main goals were:
 
-- **Waveshare ESP32-S3-Touch-LCD-4, Version 4**
-- **NMEA2000 cable** compatible with your boat network
+- Keep it affordable
+- Create a user interface that was comparable to, or better than, the old Raymarine display
+- Avoid a custom PCB
+- Avoid soldering if possible
 
-In my setup, I used a **Raymarine Spur cable**.
+## Hardware
 
-### Version 3 note
+After some searching, I found the **Waveshare ESP32-S3-Touch-LCD-4** board, which includes:
 
-A flash file is available for **Version 3** boards, but not the full source package.
+- Integrated CAN bus
+- Supply voltage up to 37 V
+- A 480 × 480 LCD touchscreen
 
-If you need the **Version 3** source files, please contact me. Also note these limitations on V3 boards:
+The board costs about **€35**, and no soldering is required.
 
-- no backlight control
-- the board does not power up automatically
-- power-up must be done manually with the power key
+**Important:** there are different versions of this board. Make sure the one you buy has the **integrated CAN bus** and is version 4.
 
-### Important board warning
+The board is delivered without a housing, so I designed a housing for it in **FreeCAD**.
 
-There are multiple versions of the Waveshare board. Make sure the version you buy has the **integrated CAN bus**, otherwise it will not work for this project as intended.
+## Software Development
 
----
+I developed the sketch in the **Arduino IDE**.  
+For the user interface, I used **SquareLine Studio**.  
+For the NMEA2000 stack, I used the well-known library by **Timo Lappalainen**:
 
-## Why this project exists
+- [Timo Lappalainen on GitHub](https://github.com/ttlappalainen)
 
-My original **Raymarine ST70** display was no longer reliable. Replacing it with a commercial product would have cost about **EUR 500 to EUR 600**, so I decided to build an alternative myself.
+After about six months of development, and with a little help from ChatGPT for some routines, I am happy to share the finished project.
 
-Main design goals:
+## Software Notes
 
-- **affordable**
-- a user interface comparable to, or better than, the original Raymarine display
-- **no custom PCB**
-- **no soldering if possible**
+This software uses the ESP32-S3 quite heavily:
 
-The result is this project: a low-cost ESP32-S3-based NMEA2000 display with touch UI, autopilot support, and 3D-printable housing.
+- The **NMEA2000 library and decoding logic** run in a FreeRTOS task on **core 0**
+- Using core 0 was necessary because the NMEA2000 network can be busy at high data rates
+- With a single large sketch running on core 1, I was missing some NMEA2000 messages
+- The user interface stores graphical assets in a **9.9 MB FFAT partition**
+- At startup, those assets are copied into **PSRAM**
+- The normal flash partition for the sketch is too small for all graphics
+- PSRAM is much faster than reading graphical assets directly from flash, which improves screen refresh performance
 
----
+The FFAT-based approach means the graphical assets must be uploaded separately. A small **FFAT uploader sketch** is included for that purpose. You can also use **ESPConnect** instead.
 
-## Software stack
+There is also a small auxiliary FreeRTOS task for the onboard beeper. When the beeper routine was integrated directly into the UI sketch using `millis()`, the beeps became irregular because of the screen update load.
 
-- **Arduino IDE** for firmware development
-- **SquareLine Studio** for the UI design
-- **[NMEA2000 library by Timo Lappalainen](https://github.com/ttlappalainen)**
-- **FreeCAD** for the housing design
+### Important for people modifying the code
 
-After roughly six months of development, the project reached a stable state that I am happy to share.
+The LCD on this Waveshare board uses an **RGB interface**, so LCD timing is critical. I fine-tuned the timing values in `lvgl_port_v8.h`. Changing those settings can corrupt the display.
 
----
+Please also pay close attention to the library versions recommended on the Waveshare wiki:
 
-## Quick start
+- [Waveshare ESP32-S3-Touch-LCD-4 Wiki](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4)
 
-The easiest way to get the display running is to flash the ready-made binary.
+This also affects which version of **SquareLine Studio** you can use, because recent versions dropped support for **LVGL 8.4**.
 
-### Easy method: flash the `.bin` file
+**Modifying this project is not for beginners.**
 
-The repository contains a **`bin file/`** directory with firmware binaries generated using **[ESPConnect](https://thelastoutpostworkshop.github.io/ESPConnect/)**.
+## Easy Method: Flash the Ready-Made Binary
 
-Choose the correct binary for your board version (**V3** or **V4**).
+In the repository there is a directory called **`bin file`**. It contains ready-made firmware generated with **ESPConnect**:
+
+- [ESPConnect](https://thelastoutpostworkshop.github.io/ESPConnect/)
+
+Choose the binary that matches your board version (**Version 3** or **Version 4**).
 
 ### Flashing with ESPConnect
 
-1. Connect the ESP32-S3 board to your computer by USB.
-2. Open **ESPConnect**.
-3. Select the correct USB port.
-4. Open **Flash Tools**.
-5. In **Flash Firmware**, browse to the correct `.bin` file in the `bin file/` directory.
-6. Click **Flash Firmware**.
-7. After flashing, connect the board to your boat network.
+1. Connect to the ESP32-S3 using the correct USB port.
 
-![Flashing the firmware with ESPConnect](images/easy-method-espconnect.png)
+<p>
+  <img src="images/espconnect-connect.png" alt="ESPConnect connect button" width="680">
+</p>
 
----
+2. Open **Flash Tools**.
 
-## Build from source
+<p>
+  <img src="images/espconnect-flash-tools.png" alt="ESPConnect Flash Tools section" width="410">
+</p>
 
-For people who want to modify the code or UI, the full source files and supporting folders are included.
+3. In **Flash Firmware**, select the correct `.bin` file from the `bin file` directory.
 
-### Important technical notes
+<p>
+  <img src="images/espconnect-select-bin.png" alt="ESPConnect firmware binary selection" width="850">
+</p>
 
-The software pushes the ESP32-S3 quite hard:
+4. Click **Flash Firmware**.
 
-- The **NMEA2000 decoding logic** runs in an **RTOS task on core 0**.
-- This was necessary because high NMEA2000 traffic caused missed messages in a classic single-loop sketch.
-- UI graphics are stored in the **FFAT/FATFS partition** and copied to **PSRAM** at startup.
-- This approach was needed because the sketch partition and standard RAM were not large enough for the graphics.
-- A separate RTOS task handles the onboard **beeper** for more regular alarm timing.
+<p>
+  <img src="images/espconnect-flash-button.png" alt="ESPConnect flash firmware button" width="420">
+</p>
 
-### Warning for developers
+That is it. Once flashing is complete, you only need to connect the board to your boat network.
 
-This project is **not beginner-friendly** to modify.
+## Build from Source
 
-The display is driven over **RGB timing**, so the timing values in `lvgl_port_v8.h` are important. Incorrect settings may corrupt the display.
+The source files and libraries are included in their respective folders.
 
-Also pay attention to:
+### 1. Load assets into FFAT
 
-- the library versions recommended on the **[Waveshare wiki](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4)**
-- the **LVGL 8.4** requirement
-- SquareLine Studio version compatibility
+The graphical assets from the **`FFAT drive`** inside the **`Squareline Studio`** folder must be uploaded to the FFAT partition on the Waveshare board.
 
----
+For that, use the helper sketch in the **`FFATuploader`** folder and upload it to your board first.
 
-## Source build steps
+Then:
 
-### 1. Upload UI assets to FFAT
+- Connect to the Wi-Fi access point **`ESP32S3_FFAT_UPLOAD`**
+- Password: **`12345678`**
+- Open a browser and go to **`192.168.4.1`**
+- In the field labelled **`Doelmap`** (target directory), enter: **`/assets`**
+- Click **Browse...**
+- Go to the `FFAT drive` folder inside the `Squareline Studio` folder
+- Select all files
+- Click **Upload**
 
-All graphical asset files from the **FFAT drive** inside the **SquareLine Studio** project must be uploaded to the FFAT partition on the Waveshare board.
+The upload takes about 20 seconds.
 
-Use the helper sketch in the **`FFATuploader/`** folder.
+<p>
+  <img src="images/ffat-uploader.png" alt="FFAT uploader interface and asset upload process" width="850">
+</p>
 
-#### FFAT upload procedure
+### 2. Compile and upload the sketch in the Arduino IDE
 
-1. Compile and upload the **FFAT uploader** sketch to the board.
-2. Connect to the ESP32-S3 Wi-Fi access point:
-   - **SSID:** `ESP32S3_FFAT_UPLOAD`
-   - **Password:** `12345678`
-3. Open a browser and go to: `http://192.168.4.1`
-4. In the **Doelmap** field, enter: `/assets`
-5. Click **Browse...** and select **all files** from the `drive` / FFAT asset folder in the SquareLine Studio project.
-6. Click **Upload**.
+This part is straightforward, but pay attention to the following.
 
-The upload takes roughly **20 seconds**.
+#### Board manager
 
-![Uploading UI assets to FFAT](images/ffat-uploader.png)
+Use the correct ESP32 board package in the Arduino IDE. In my setup, I used **ESP32 board manager version 3.3.7**.
 
-### 2. Compile and upload the Arduino sketch
+<p>
+  <img src="images/arduino-board-manager.png" alt="Arduino IDE ESP32 board manager version" width="470">
+</p>
 
-This part is straightforward, but check the following carefully:
+#### Board settings
 
-- select the correct **Waveshare ESP32-S3** board in the Arduino IDE
-- use **ESP32 board package version 3.3.7**
-- use the correct Waveshare board settings
+Use the correct settings for the Waveshare board.
 
-#### Arduino board manager
+<p>
+  <img src="images/arduino-board-settings.png" alt="Arduino IDE board settings for the Waveshare board" width="460">
+</p>
 
-![Arduino IDE board manager with ESP32 package](images/arduino-board-manager.png)
+After that, compiling and uploading should work normally.
 
-#### Recommended board settings
+As a side note: I originally started this project on **Windows 10**, where compilation in the Arduino IDE was painfully slow. After moving to **Linux Mint** in dual boot, compilation became much faster.
 
-![Recommended Arduino IDE settings for the Waveshare board](images/arduino-board-settings.png)
+## SquareLine Studio Project
 
-Once those settings are correct, compiling and uploading should work normally.
+The full SquareLine Studio project is included in the **`Squareline Studio`** folder.
 
-> Side note: compile times were much faster for me on Linux Mint than on Windows 10.
+If you want to modify it, keep these rules in mind:
 
----
+- Use **SquareLine Studio 1.5.4**
+- Newer versions no longer support **LVGL 8.4**
+- This Waveshare board works with **LVGL up to 8.4**
+- Later LVGL versions will not work correctly with this board
 
-## SquareLine Studio notes
+### SquareLine Studio export settings
 
-The full SquareLine Studio project is included in the **`Squareline Studio/`** folder.
+Use the following export settings:
 
-### Required version
+<p>
+  <img src="images/squareline-project-settings.png" alt="SquareLine Studio export settings" width="850">
+</p>
 
-Use **SquareLine Studio 1.5.4**.
+When SquareLine Studio exports the UI, two folders are important:
 
-Newer versions dropped support for **LVGL 8.4**, which this Waveshare setup depends on.
+- the **drive** folder
+- the **UI files** folder
 
-### Export settings
+<p>
+  <img src="images/squareline-export-folders.png" alt="SquareLine Studio export folders" width="850">
+</p>
 
-Configure the project export settings as shown below.
+### Important file copy rule
 
-The two important output folders are:
-
-- **drive**
-- **UI files**
-
-![SquareLine Studio project export settings](images/squareline-project-settings.png)
-
-### Important warning about exported UI files
-
-Copy **all files** from the `UI files` folder into the Arduino sketch folder **except**:
+Copy all files from the **`UI files`** folder into the Arduino sketch folder **except**:
 
 - `ui_img_manager.c`
 - `ui_img_manager.h`
 
-Those two files are already present in the Arduino sketch and were modified to work correctly with **PSRAM**.
+Those two files are already present in the Arduino sketch folder in modified form so they can work with PSRAM.
 
-If you add or replace image assets, the updated files will appear in the **drive** folder. Upload them again to FFAT as described above.
+<p>
+  <img src="images/squareline-do-not-copy-ui-img-manager.png" alt="Files that should not be overwritten" width="780">
+</p>
 
-![Warning not to overwrite ui_img_manager files](images/ui-files-warning.png)
-
----
+If you add or replace assets, the new assets will be in the **drive** folder. You must upload them again to the FFAT partition as described above. I usually reformat the FFAT partition before uploading updated assets. The FFAT uploader tool includes a button for that.
 
 ## Housing
 
-The **`Freecad/`** folder contains the housing design files.
+The housing files are included in the **`Freecad`** folder.
 
-- designed in **FreeCAD 1.0**
-- also compatible with **FreeCAD 1.1**
-- printable files for 3D printing are included
+The housing was designed in **FreeCAD 1.0**, but the files are also compatible with **FreeCAD 1.1**. Files for direct 3D printing are included as well.
 
-The housing uses the same mounting hole pattern as a **Raymarine ST70**.
+There are mounting holes for **2.5 mm screws**, but I found that it is very easy to crack the LCD glass if the screws are tightened even a little too much. I now glue the display in place instead, which is safer.
 
-### Practical note
+## Hardware Connections
 
-I originally used small **2.5 mm screws**, but it is very easy to crack the LCD glass if the screws are tightened even slightly too much.
+Use an NMEA2000 cable and cut it to the desired length.
 
-I now **glue the display in place**, which I consider safer.
+For **Raymarine Seatalk NG**, the wire colors are:
 
----
+- **Red** → `Vin`
+- **Black** → `GND`
+- **White** → `CAN H`
+- **Blue** → `CAN L`
 
-## Hardware connections
-
-Wiring is simple: use a compatible **NMEA2000 cable** and cut it to the required length.
-
-For **Raymarine SeaTalk NG**, the wire colors are:
-
-- **Red** -> `Vin`
-- **Black** -> `GND`
-- **White** -> `CAN H`
-- **Blue** -> `CAN L`
-
-![Waveshare board wiring for NMEA2000 / SeaTalk NG](images/hardware-connections.png)
-
----
-
-## Repository contents
-
-Typical folders in this project:
-
-- **`src/`** - Arduino source code
-- **`bin file/`** - ready-to-flash firmware binaries
-- **`Squareline Studio/`** - UI project and exported assets
-- **`Freecad/`** - enclosure design files
-- **`images/`** - README images and screenshots
-- **`pdf documentation/`** - additional documentation
-
----
-
-## Support
-
-If this project is useful to you and you want to help support future improvements, you can use:
-
-- **[Buy Me a Coffee](https://buymeacoffee.com/francissailor)**
-
----
+<p>
+  <img src="images/hardware-connections.png" alt="Hardware wiring for the Waveshare board" width="620">
+</p>
 
 ## Contact
 
-If you need more information or run into problems, contact me at:
+If you have problems, or if you need more clarification, please send me an email:
 
 **franciscontact@hotmail.com**
+
+---
+
+> **☕ If you found this project useful, you can support it here:** [Buy Me a Coffee](https://buymeacoffee.com/francissailor)
