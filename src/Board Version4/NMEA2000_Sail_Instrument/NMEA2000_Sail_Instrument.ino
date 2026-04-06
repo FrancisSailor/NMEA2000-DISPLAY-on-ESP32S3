@@ -356,7 +356,7 @@ void write_UnitSettings2Flash(){
     FlashStorage.putInt("Unit_Wind", Unit_Wind);
     FlashStorage.putInt("Unit_Depth", Unit_Depth);
     FlashStorage.putInt("Unit_Wnd_Damp", Unit_Wind_Damping);
-    FlashStorage.putInt("Unit_Hdng_Damp", Unit_Heading_Damping);
+    //FlashStorage.putInt("Unit_Hdng_Damp", Unit_Heading_Damping);
     FlashStorage.putBool("Unit_Sil_Alm", Unit_Silence_Alarm);
     FlashStorage.end();
   }
@@ -472,6 +472,7 @@ void StoreUnitSettings(lv_event_t * e) { // OK button press event on settings sc
     Unit_Wind = lv_dropdown_get_selected(ui_WindDropdown);
     Unit_Depth = lv_dropdown_get_selected(ui_DepthDropdown);
     Unit_Wind_Damping = lv_slider_get_value(ui_WindDampingSlider);
+    Unit_Heading_Damping = lv_slider_get_value(ui_HeadingDampingSlider);
     if (lv_obj_has_state(ui_AutoSilenceNoPilot, LV_STATE_CHECKED)) Unit_Silence_Alarm = true;
       else                                                         Unit_Silence_Alarm = false;
     write_UnitSettings2Flash();
