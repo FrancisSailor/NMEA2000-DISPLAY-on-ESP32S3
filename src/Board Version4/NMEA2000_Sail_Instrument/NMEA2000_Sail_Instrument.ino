@@ -36,6 +36,9 @@ tNMEA2000 &NMEA2000 = *(new NMEA2000_esp32_twai());
 #include <n2k.h>
 
 static void ui_update_timer_cb(lv_timer_t * timer); // create a task for all display related functions with a refresh timer in millisec (in lvgl_port_v8.h this task is pinned to core 0 on line 53)
+static void BacklightDialog_CancelPending(const char * reason = nullptr);
+static void BacklightDialog_GestureGuard(lv_event_t * e);
+static void RegisterBacklightDialogGuards();
 
 uint32_t Touch_Button_Clamp = 1000, Button_Clamp_millis; //Touch_Button_Clamp clamps the touchbutton state for the number of millis specified, to give time at the AP to conform the status set by the buttons
 
@@ -52,6 +55,13 @@ uint32_t Beep_on_timeout = 100, Beep_off_timeout = 300, TimeOut_millis_timeout =
 
 bool BacklightDialog_Active = false, oldBacklightDialog_Active = false;
 uint32_t BacklightDialog_Timeout;
+
+static bool BacklightDialog_RequestPending = false;
+static uint32_t BacklightDialog_RequestMillis = 0;
+static uint32_t BacklightDialog_GestureBusyUntil = 0;
+static lv_obj_t *BacklightDialog_RequestScreen = nullptr;
+static constexpr uint32_t BacklightDialog_TouchSettleMs = 120;
+static constexpr uint32_t BacklightDialog_GestureGuardMs = 850;
 
 // V4 helper MCU backend for the Waveshare V4 board.
 // The beeper is driven by CH32V003 register 0x02 bit 6. Register 0x03 = 0x3A
@@ -246,6 +256,34 @@ void Beep(){
 byte Dialog_Status; // global variable to store the Do_Show_Dialog screen Warning_Type (determines behaviour of the screen)
 lv_obj_t *Return_Screen;
 
+static void BacklightDialog_CancelPending(const char * reason) {
+  if (BacklightDialog_RequestPending && (reason != nullptr)) {
+    Serial.printf("Backlight dialog request cancelled: %s\n", reason);
+  }
+  BacklightDialog_RequestPending = false;
+  BacklightDialog_RequestMillis = 0;
+  BacklightDialog_GestureBusyUntil = 0;
+  BacklightDialog_RequestScreen = nullptr;
+}
+
+static void BacklightDialog_GestureGuard(lv_event_t * e) {
+  (void)e;
+  BacklightDialog_GestureBusyUntil = millis() + BacklightDialog_GestureGuardMs;
+  if (BacklightDialog_RequestPending && !BacklightDialog_Active) {
+    BacklightDialog_CancelPending("gesture overlap");
+  }
+}
+
+static void RegisterBacklightDialogGuards() {
+  lv_obj_add_event_cb(ui_ScrWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+  lv_obj_add_event_cb(ui_ScrAutopilot, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+  lv_obj_add_event_cb(ui_ScrXTE, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+  lv_obj_add_event_cb(ui_ScrNav, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+  lv_obj_add_event_cb(ui_ScrAppWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+  lv_obj_add_event_cb(ui_ScrTruWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+  lv_obj_add_event_cb(ui_ScrInfo, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+}
+
 #include <Preferences.h>  // esp32 library to write variables to flash
 Preferences FlashStorage; // to store calibrations in Flash
 int Unit_Initialise, Unit_Speed, Unit_Position, Unit_Distance, Unit_Wind, Unit_Depth, Unit_Wind_Damping, Unit_Heading_Damping;
@@ -280,6 +318,7 @@ void setup() {
     
     lvgl_port_lock(-1); /* Lock the mutex due to the LVGL APIs are not thread-safe */
     ui_init();
+    RegisterBacklightDialogGuards();
     if (!ui_assets_all_ok()) {
         while (true) { delay(1000); }
     }
@@ -754,6 +793,8 @@ void Wind_pressed(lv_event_t * e) { // detect button press of the track button
 
 void Do_Show_Dialog (bool OK_Visible, bool Cancel_Visible, const char* Warning_Text, byte Warning_Type) {
  
+  BacklightDialog_CancelPending("dialog took priority");
+
   lv_obj_t *ActScr = lv_scr_act();
   if (ActScr != ui_DialogScr)    // the return screen can never be the warning screen
     Return_Screen = lv_scr_act(); // Store the screen which was active before calling the dialog screen
@@ -807,17 +848,44 @@ void Do_Show_Dialog (bool OK_Visible, bool Cancel_Visible, const char* Warning_T
 }
 
 void DoSetBacklight(lv_event_t * e){  // is triggered by long press event on a screen (regardless which screen)
-  BacklightDialog_Active = true;      // and will activate the backlightscreen
-  oldBacklightDialog_Active = false;   // needed for 1 time trigger action
+  (void)e;
+
+  if (BacklightDialog_Active || BacklightDialog_RequestPending) {
+    return;
+  }
+
+  lv_obj_t *ActScr = lv_scr_act();
+  if ((ActScr == ui_DialogScr) || (ActScr == ui_SplashScr)) {
+    return;
+  }
+
+  BacklightDialog_RequestScreen = ActScr;
+
+  lv_indev_t * indev = lv_indev_get_act();
+  if (indev != NULL) {
+    lv_indev_wait_release(indev);
+  }
+
+  BacklightDialog_RequestPending = true;
+  BacklightDialog_RequestMillis = millis();
+  BacklightDialog_GestureBusyUntil = BacklightDialog_RequestMillis + BacklightDialog_TouchSettleMs;
 }
 
 void Do_Show_SetBacklight() {
   //Beep();   //This beep interacts with other i2c traffic and causes occasional problems
   oldBacklightDialog_Active = true; // block successive calls to this routine
+  BacklightDialog_RequestPending = false;
+  BacklightDialog_RequestMillis = 0;
+  BacklightDialog_GestureBusyUntil = 0;
   V4_LastBacklightSliderValue = lv_slider_get_value(ui_BacklightSlider);
-  Return_Screen = lv_scr_act(); // Store the screen which was active before calling the dialog screen
-  lv_obj_add_flag(ui_WarningPanel, LV_OBJ_FLAG_HIDDEN); // make WarningPanel visible
-  lv_obj_clear_flag(ui_BacklightPanel, LV_OBJ_FLAG_HIDDEN); // and hide Backlightpanel
+  if ((BacklightDialog_RequestScreen != nullptr) && (BacklightDialog_RequestScreen != ui_DialogScr)) {
+    Return_Screen = BacklightDialog_RequestScreen; // return to the stable screen from which the request originated
+  } else {
+    Return_Screen = lv_scr_act(); // fallback if there is no stored request screen
+  }
+  BacklightDialog_RequestScreen = nullptr;
+  lv_obj_add_flag(ui_WarningPanel, LV_OBJ_FLAG_HIDDEN); // hide WarningPanel
+  lv_obj_clear_flag(ui_BacklightPanel, LV_OBJ_FLAG_HIDDEN); // show Backlightpanel
 
   lv_scr_load(ui_DialogScr);
 }
@@ -904,7 +972,7 @@ void DialogOK(lv_event_t * e) { // detect button press of the ok button on the d
   switch (Dialog_Status) {
     case 0: // actions when dialogscr displays an error
     case 1: // actions when dialogscr displays a warning
-    case 2: // actions when dialogscr displays a critucal error
+    case 2: // actions when dialogscr displays a critical error
       N2K::Silence_Alarm();
       Dialog_Status = 10; // this is an undefined status which will be detected in other routines
       break;
@@ -1246,6 +1314,20 @@ static void ui_update_timer_cb(lv_timer_t * timer) {
   else if (N2K::apHasWarning()) {
     if (ActScr != ui_DialogScr)
       Do_Show_Dialog (true, false, N2K::apWarningText(), 1);  // displays warning dialog when a warning is detected on the NMEA2000 network
+  }
+
+  if (BacklightDialog_RequestPending) {
+    if (N2K::apHasAlarm() || N2K::apHasWarning()) {
+      BacklightDialog_CancelPending("alarm/warning took priority");
+    } else if (millis() >= BacklightDialog_GestureBusyUntil) {
+      lv_obj_t *CurrentScr = lv_scr_act();
+      if ((BacklightDialog_RequestScreen != nullptr) && (CurrentScr != BacklightDialog_RequestScreen)) {
+        BacklightDialog_CancelPending("screen changed before dialog open");
+      } else {
+        BacklightDialog_Active = true;
+        oldBacklightDialog_Active = false;
+      }
+    }
   }
 
   if (!BacklightDialog_Active){
