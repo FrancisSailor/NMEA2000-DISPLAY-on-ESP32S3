@@ -9,7 +9,7 @@ Based on work by Homberger and Timo Lappalainen.
 A DIY NMEA2000 display for the Waveshare ESP32-S3-Touch-LCD-4, with autopilot support, alarm handling, and a touchscreen user interface designed as an affordable replacement for older marine displays such as the Raymarine ST70.
 
 > **☕ If this project helps you, you're welcome to support it here:** [Buy Me a Coffee](https://buymeacoffee.com/francissailor)  
-> Even a small contribution helps me keep improving the project.
+> Even a small contribution helps me keep improving the project. I am using the funding to develop a watertight and sunlight readable screen as to be able to use it outdoors / in the cockpit. 
 
 ## What to Expect
 
