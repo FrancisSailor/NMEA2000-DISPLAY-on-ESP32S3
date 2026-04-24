@@ -9,13 +9,13 @@
 // IMAGE DATA: assets/WindContour.png
 lv_img_dsc_t ui_img_windcontour_png = {
     .header.always_zero = 0,
-    .header.w = 500,
-    .header.h = 507,
+    .header.w = 415,
+    .header.h = 419,
     .header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA,
 };
 
 void ui_img_windcontour_png_load()
 {
-    ui_img_windcontour_png.data = UI_LOAD_IMAGE("F:assets/ui_img_windcontour_png.bin", 760500);
-    ui_img_windcontour_png.data_size = 760500;
+    ui_img_windcontour_png.data = UI_LOAD_IMAGE("F:assets/ui_img_windcontour_png.bin", 521655);
+    ui_img_windcontour_png.data_size = 521655;
 }

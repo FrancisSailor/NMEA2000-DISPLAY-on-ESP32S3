@@ -43,8 +43,11 @@ void ui_init(void)
     ui_img_helmman_png_load();
     ui_img_boat_png_load();
     ui_img_1883567225_load();
+    ui_img_zoomin_png_load();
     ui_img_windcontour_png_load();
+    ui_img_circcaleclosehaul_png_load();
     ui_img_needle_png_load();
+    ui_img_warning_png_load();
     ui_img_settings_png_load();
     ui_img_ok_png_load();
     ui_img_cancel_png_load();
@@ -52,7 +55,7 @@ void ui_init(void)
     ui_img_brightness_png_load();
     ui_img_error_png_load();
     ui_img_error2_png_load();
-    ui_img_warning_png_load();
+    ui_img_zoomout_png_load();
     ui_img_turn_port_png_load();
     ui_SplashScr_screen_init();
     ui_ScrWind_screen_init();

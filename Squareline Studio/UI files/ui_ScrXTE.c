@@ -48,19 +48,19 @@ void ui_event_ScrXTE(lv_event_t * e)
 
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_RIGHT) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrWind, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 700, 0, &ui_ScrWind_screen_init);
+        _ui_screen_change(&ui_ScrWind, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, &ui_ScrWind_screen_init);
     }
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrNav, LV_SCR_LOAD_ANIM_MOVE_LEFT, 700, 0, &ui_ScrNav_screen_init);
+        _ui_screen_change(&ui_ScrNav, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, &ui_ScrNav_screen_init);
     }
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_BOTTOM) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 700, 0, &ui_ScrAutopilot_screen_init);
+        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 500, 0, &ui_ScrAutopilot_screen_init);
     }
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_TOP) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_TOP, 700, 0, &ui_ScrAutopilot_screen_init);
+        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_TOP, 500, 0, &ui_ScrAutopilot_screen_init);
     }
     if(event_code == LV_EVENT_LONG_PRESSED) {
         DoSetBacklight(e);
@@ -72,7 +72,7 @@ void ui_event_ScrXTE(lv_event_t * e)
 void ui_ScrXTE_screen_init(void)
 {
     ui_ScrXTE = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_ScrXTE, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_clear_flag(ui_ScrXTE, LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM);      /// Flags
 
     ui_HelmManPanel = lv_obj_create(ui_ScrXTE);
     lv_obj_set_width(ui_HelmManPanel, 460);
@@ -318,6 +318,8 @@ void ui_ScrXTE_screen_init(void)
     lv_obj_set_y(ui_ETWday, -35);
     lv_obj_set_align(ui_ETWday, LV_ALIGN_CENTER);
     lv_label_set_text(ui_ETWday, "Day + --");
+    lv_obj_clear_flag(ui_ETWday, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
 
     lv_obj_add_event_cb(ui_ScrXTE, ui_event_ScrXTE, LV_EVENT_ALL, NULL);
     ui_ScrXTE = ui_ScrXTE;

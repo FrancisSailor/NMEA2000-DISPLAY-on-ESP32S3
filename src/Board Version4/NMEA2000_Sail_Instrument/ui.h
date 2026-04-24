@@ -55,10 +55,16 @@ extern lv_img_dsc_t ui_img_boat_png;   // assets/boat.png
 void ui_img_boat_png_load();
 extern lv_img_dsc_t ui_img_1883567225;   // assets/long-arrow-left.png
 void ui_img_1883567225_load();
+extern lv_img_dsc_t ui_img_zoomin_png;   // assets/ZoomIn.png
+void ui_img_zoomin_png_load();
 extern lv_img_dsc_t ui_img_windcontour_png;   // assets/WindContour.png
 void ui_img_windcontour_png_load();
+extern lv_img_dsc_t ui_img_circcaleclosehaul_png;   // assets/circcaleCloseHaul.png
+void ui_img_circcaleclosehaul_png_load();
 extern lv_img_dsc_t ui_img_needle_png;   // assets/needle.png
 void ui_img_needle_png_load();
+extern lv_img_dsc_t ui_img_warning_png;   // assets/Warning.png
+void ui_img_warning_png_load();
 extern lv_img_dsc_t ui_img_settings_png;   // assets/settings.png
 void ui_img_settings_png_load();
 extern lv_img_dsc_t ui_img_ok_png;   // assets/ok.png
@@ -73,8 +79,8 @@ extern lv_img_dsc_t ui_img_error_png;   // assets/Error.png
 void ui_img_error_png_load();
 extern lv_img_dsc_t ui_img_error2_png;   // assets/Error2.png
 void ui_img_error2_png_load();
-extern lv_img_dsc_t ui_img_warning_png;   // assets/Warning.png
-void ui_img_warning_png_load();
+extern lv_img_dsc_t ui_img_zoomout_png;   // assets/ZoomOut.png
+void ui_img_zoomout_png_load();
 extern lv_img_dsc_t ui_img_turn_port_png;   // assets/turn_port.png
 void ui_img_turn_port_png_load();
 

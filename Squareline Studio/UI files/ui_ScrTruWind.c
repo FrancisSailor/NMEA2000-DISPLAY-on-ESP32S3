@@ -55,13 +55,16 @@ void ui_event_ScrTruWind(lv_event_t * e)
 void ui_ScrTruWind_screen_init(void)
 {
     ui_ScrTruWind = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_ScrTruWind, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_clear_flag(ui_ScrTruWind, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
+                      LV_OBJ_FLAG_SCROLL_MOMENTUM);      /// Flags
+    lv_obj_set_style_bg_color(ui_ScrTruWind, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_ScrTruWind, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_Image6 = lv_img_create(ui_ScrTruWind);
     lv_img_set_src(ui_Image6, &ui_img_windcontour_png);
     lv_obj_set_width(ui_Image6, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Image6, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Image6, -7);
+    lv_obj_set_x(ui_Image6, 0);
     lv_obj_set_y(ui_Image6, -3);
     lv_obj_set_align(ui_Image6, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_Image6, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
@@ -120,6 +123,8 @@ void ui_ScrTruWind_screen_init(void)
     lv_obj_set_y(ui_WindLbl4, 133);
     lv_obj_set_align(ui_WindLbl4, LV_ALIGN_CENTER);
     lv_label_set_text(ui_WindLbl4, "knots");
+    lv_obj_clear_flag(ui_WindLbl4, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_color(ui_WindLbl4, lv_color_hex(0x5A595A), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_WindLbl4, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WindLbl4, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);

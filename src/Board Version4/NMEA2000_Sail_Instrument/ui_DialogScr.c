@@ -193,7 +193,7 @@ void ui_DialogScr_screen_init(void)
     lv_obj_set_width(ui_Image7, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Image7, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_Image7, -145);
-    lv_obj_set_y(ui_Image7, -12);
+    lv_obj_set_y(ui_Image7, -16);
     lv_obj_set_align(ui_Image7, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_Image7, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Image7, LV_OBJ_FLAG_SCROLLABLE);      /// Flags

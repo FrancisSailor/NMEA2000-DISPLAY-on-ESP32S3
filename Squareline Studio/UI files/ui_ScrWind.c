@@ -40,7 +40,7 @@ void ui_event_ScrWind(lv_event_t * e)
 
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_LEFT, 700, 0, &ui_ScrAutopilot_screen_init);
+        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, &ui_ScrAutopilot_screen_init);
     }
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_RIGHT) {
         lv_indev_wait_release(lv_indev_get_act());
@@ -64,7 +64,8 @@ void ui_event_ScrWind(lv_event_t * e)
 void ui_ScrWind_screen_init(void)
 {
     ui_ScrWind = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_ScrWind, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_clear_flag(ui_ScrWind, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
+                      LV_OBJ_FLAG_SCROLL_MOMENTUM);      /// Flags
     lv_obj_set_style_bg_color(ui_ScrWind, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ScrWind, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -77,7 +78,8 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_y(ui_Rudder, 110);
     lv_obj_set_align(ui_Rudder, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_Rudder, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE);     /// Flags
+                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_radius(ui_Rudder, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_Rudder, lv_color_hex(0xFFFDFD), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_Rudder, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -115,8 +117,7 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_align(ui_CompassRoseImg, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_CompassRoseImg,
                       LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE |
-                      LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+                      LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
 
     ui_AppWindImg = lv_img_create(ui_ScrWind);
     lv_img_set_src(ui_AppWindImg, &ui_img_appwind_png);
@@ -133,7 +134,8 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_height(ui_TrueWindImg, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_align(ui_TrueWindImg, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_TrueWindImg, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE);     /// Flags
+                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
 
     ui_AppWindSpeed = lv_label_create(ui_ScrWind);
     lv_obj_set_width(ui_AppWindSpeed, 150);
@@ -208,7 +210,8 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_align(ui_Label19, LV_ALIGN_CENTER);
     lv_label_set_text(ui_Label19, "Rudder");
     lv_obj_clear_flag(ui_Label19, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE);     /// Flags
+                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
 
     ui_Heading = lv_label_create(ui_ScrWind);
     lv_obj_set_width(ui_Heading, 95);
@@ -218,7 +221,8 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_align(ui_Heading, LV_ALIGN_CENTER);
     lv_label_set_text(ui_Heading, "---");
     lv_obj_clear_flag(ui_Heading, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE);     /// Flags
+                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_align(ui_Heading, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Heading, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_radius(ui_Heading, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -235,6 +239,8 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_y(ui_Label38, -29);
     lv_obj_set_align(ui_Label38, LV_ALIGN_CENTER);
     lv_label_set_text(ui_Label38, "AWS");
+    lv_obj_clear_flag(ui_Label38, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_color(ui_Label38, lv_color_hex(0x5A595A), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_Label38, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label38, &lv_font_montserrat_40, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -246,6 +252,8 @@ void ui_ScrWind_screen_init(void)
     lv_obj_set_y(ui_WindLbl1, 55);
     lv_obj_set_align(ui_WindLbl1, LV_ALIGN_CENTER);
     lv_label_set_text(ui_WindLbl1, "knots");
+    lv_obj_clear_flag(ui_WindLbl1, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_color(ui_WindLbl1, lv_color_hex(0x5A595A), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_WindLbl1, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WindLbl1, &lv_font_montserrat_40, LV_PART_MAIN | LV_STATE_DEFAULT);

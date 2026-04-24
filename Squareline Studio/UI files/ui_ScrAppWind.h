@@ -16,7 +16,10 @@ extern void ui_ScrAppWind_screen_destroy(void);
 extern void ui_event_ScrAppWind(lv_event_t * e);
 extern lv_obj_t * ui_ScrAppWind;
 extern lv_obj_t * ui_Label24;
-extern lv_obj_t * ui_Image5;
+extern void ui_event_AWAscaletoggle(lv_event_t * e);
+extern lv_obj_t * ui_AWAscaletoggle;
+extern lv_obj_t * ui_AWANormalScale;
+extern lv_obj_t * ui_AWACloseScale;
 extern lv_obj_t * ui_AWS;
 extern lv_obj_t * ui_Label26;
 extern lv_obj_t * ui_WindLbl3;
@@ -25,14 +28,19 @@ extern lv_obj_t * ui_WaterSpeed2;
 extern lv_obj_t * ui_GroundSpeed;
 extern lv_obj_t * ui_TruWindAngle2;
 extern lv_obj_t * ui_Depth3;
+extern lv_obj_t * ui_Warning;
 // CUSTOM VARIABLES
 extern lv_obj_t * ui_ScrAppWind;
+extern lv_obj_t * ui_AWAscaletoggle;
+extern lv_obj_t * ui_AWANormalScale;
+extern lv_obj_t * ui_AWACloseScale;
 extern lv_obj_t * ui_AWS;
 extern lv_obj_t * ui_WindLbl3;
 extern lv_obj_t * ui_AWAneedle;
 extern lv_obj_t * ui_WaterSpeed2;
 extern lv_obj_t * ui_GroundSpeed;
 extern lv_obj_t * ui_Depth3;
+extern lv_obj_t * ui_Warning;
 
 #ifdef __cplusplus
 } /*extern "C"*/

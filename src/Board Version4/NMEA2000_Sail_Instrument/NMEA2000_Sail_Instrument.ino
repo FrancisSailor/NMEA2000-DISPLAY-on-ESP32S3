@@ -4,8 +4,8 @@
 // particularities of the program: 
 // - images are loaded in Ffat under directory assets. For this you need another program, A Ffat uploader. Do not compile with the erase all flash on flashing since this will erase the Ffat also
 // - On startup the sketch loads all images from Ffat to PSram for better lvgl speed. (library lv_port_fs_ffat.h)
-// - The lvgl task runs on core 0 (can be set in lvgl_port_v8.h), the NMEA2000 loop runs on core 1. This helps performance of the NMEA2000 decoding (less lost sentences)
-// - In lvgl_port_v8.h we set the priority of the task to 4 or higher, to optimise speed of display and touch handling
+// - The LVGL task runs on core 0 (configured in lvgl_arduino_v4.h), the NMEA2000 loop runs on core 1. This helps performance of the NMEA2000 decoding (less lost sentences)
+// - In lvgl_arduino_v4.h we keep the UI task priority high to optimise display and touch handling
 // - for control and visualising of the raymarine EVO pilot, proprietary raymarine pgn's are used
 // - unit settings are stored in flash
 // ====================================================================================================================================================================
@@ -19,15 +19,13 @@
 #include "freertos/semphr.h"
 
 #include <math.h>
-#include "driver/i2c.h"
-#include "esp_err.h"
-#include <ESP_Panel_Library.h>
 #include <lvgl.h>
-#include "lvgl_port_v8.h"
+#include "lvgl_arduino_v4.h"
 #include <ui.h>
 #include <FFat.h>
 #include "lv_port_fs_ffat.h"
 #include "ui_img_manager.h"
+#include "rev4_board.h"
 #define ESP32_CAN_RX_PIN GPIO_NUM_0 // gpio pins for can bus
 #define ESP32_CAN_TX_PIN GPIO_NUM_6 // gpio pins for can bus
 #include <NMEA2000_esp32_twai.h>
@@ -35,9 +33,12 @@
 tNMEA2000 &NMEA2000 = *(new NMEA2000_esp32_twai());
 #include <n2k.h>
 
-static void ui_update_timer_cb(lv_timer_t * timer); // create a task for all display related functions with a refresh timer in millisec (in lvgl_port_v8.h this task is pinned to core 0 on line 53)
+static void ui_update_timer_cb(lv_timer_t * timer); // create a timer for display-related UI refresh work; the LVGL task itself is pinned in lvgl_arduino_v4.cpp
 static void BacklightDialog_CancelPending(const char * reason = nullptr);
 static void BacklightDialog_GestureGuard(lv_event_t * e);
+static void ScreenTouchPreloadGuard(lv_event_t * e);
+static void PauseUiUpdatesForSwipeAnimation();
+static void ResumeUiUpdatesAfterSwipe(lv_timer_t * timer);
 static void RegisterBacklightDialogGuards();
 
 uint32_t Touch_Button_Clamp = 1000, Button_Clamp_millis; //Touch_Button_Clamp clamps the touchbutton state for the number of millis specified, to give time at the AP to conform the status set by the buttons
@@ -62,212 +63,68 @@ static uint32_t BacklightDialog_GestureBusyUntil = 0;
 static lv_obj_t *BacklightDialog_RequestScreen = nullptr;
 static constexpr uint32_t BacklightDialog_TouchSettleMs = 120;
 static constexpr uint32_t BacklightDialog_GestureGuardMs = 850;
+static constexpr uint32_t ScreenSwipePauseMs = 550;  // slightly longer than the 500 ms screen swipe animation
+static lv_timer_t *g_ui_update_timer = nullptr;
+static lv_timer_t *g_ui_update_resume_timer = nullptr;
 
-// V4 helper MCU backend for the Waveshare V4 board.
-// The beeper is driven by CH32V003 register 0x02 bit 6. Register 0x03 = 0x3A
-// is written once during init only; subsequent beeper pulses do read-modify-write
-// on 0x02 so only the buzzer bit changes.
-static constexpr i2c_port_t V4_EXPANDER_I2C_PORT = I2C_NUM_0;
-static constexpr uint8_t V4_EXPANDER_I2C_ADDRESS = 0x24;
-static constexpr uint8_t V4_BEEPER_PULSE_REG = 0x02;
-static constexpr uint8_t V4_BEEPER_CONFIG_REG = 0x03;
-static constexpr uint8_t V4_BEEPER_CONFIG_VALUE = 0x3A;
-static constexpr uint8_t V4_BEEPER_BIT_MASK = 0x40;     // bit 6
-static constexpr uint32_t V4_BEEP_SHORT_MS = 30;        // Matches the original keypress beep behaviour.
-static constexpr uint32_t V4_STARTUP_BEEP_MS = 120;
-static constexpr uint8_t V4_BACKLIGHT_REG = 0x05;
-static TaskHandle_t V4_BeeperTaskHandle = nullptr;
-static portMUX_TYPE V4_BeeperMux = portMUX_INITIALIZER_UNLOCKED;
-static SemaphoreHandle_t V4_ExpanderMutex = nullptr;
 static int16_t V4_LastBacklightSliderValue = -1;
 
-static volatile bool V4_BeeperStartReq = false;
-static volatile bool V4_BeeperStopReq = false;
-static volatile uint32_t V4_BeeperReqOnMs = 0;
-static volatile uint32_t V4_BeeperReqOffMs = 0;
-static volatile uint16_t V4_BeeperReqRepeat = 0;
-
-static bool v4_expander_write_reg_unlocked(uint8_t reg, uint8_t value) {
-  uint8_t buf[2] = {reg, value};
-  esp_err_t err = i2c_master_write_to_device(V4_EXPANDER_I2C_PORT, V4_EXPANDER_I2C_ADDRESS, buf, sizeof(buf), pdMS_TO_TICKS(50));
-  if (err != ESP_OK) {
-    Serial.printf("V4 expander write failed: reg=0x%02X value=0x%02X err=%s\n", reg, value, esp_err_to_name(err));
-    return false;
-  }
-  return true;
-}
-
-static bool v4_expander_read_reg_unlocked(uint8_t reg, uint8_t &value) {
-  esp_err_t err = i2c_master_write_read_device(V4_EXPANDER_I2C_PORT, V4_EXPANDER_I2C_ADDRESS, &reg, 1, &value, 1, pdMS_TO_TICKS(50));
-  if (err != ESP_OK) {
-    Serial.printf("V4 expander read failed: reg=0x%02X err=%s\n", reg, esp_err_to_name(err));
-    return false;
-  }
-  return true;
-}
-
-static bool v4_expander_write_reg(uint8_t reg, uint8_t value) {
-  if (V4_ExpanderMutex != nullptr) {
-    if (xSemaphoreTake(V4_ExpanderMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
-      Serial.printf("V4 expander mutex timeout: reg=0x%02X value=0x%02X\n", reg, value);
-      return false;
-    }
-  }
-
-  bool ok = v4_expander_write_reg_unlocked(reg, value);
-
-  if (V4_ExpanderMutex != nullptr) {
-    xSemaphoreGive(V4_ExpanderMutex);
-  }
-
-  return ok;
-}
-
-static bool v4_beeper_update_bit(bool active) {
-  if (V4_ExpanderMutex != nullptr) {
-    if (xSemaphoreTake(V4_ExpanderMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
-      Serial.println("V4 beeper mutex timeout");
-      return false;
-    }
-  }
-
-  uint8_t current = 0;
-  bool ok = v4_expander_read_reg_unlocked(V4_BEEPER_PULSE_REG, current);
-  if (ok) {
-    const uint8_t updated = active ? (current | V4_BEEPER_BIT_MASK) : (current & ~V4_BEEPER_BIT_MASK);
-    if (updated != current) {
-      ok = v4_expander_write_reg_unlocked(V4_BEEPER_PULSE_REG, updated);
-    }
-  }
-
-  if (V4_ExpanderMutex != nullptr) {
-    xSemaphoreGive(V4_ExpanderMutex);
-  }
-
-  return ok;
-}
-
-static bool v4_beeper_init() {
-  bool ok = v4_expander_write_reg(V4_BEEPER_CONFIG_REG, V4_BEEPER_CONFIG_VALUE);
-  if (ok) {
-    ok = v4_beeper_update_bit(false);
-  }
-  Serial.printf("V4 beeper init: %s, config=0x%02X, mask=0x%02X\n", ok ? "ok" : "failed", V4_BEEPER_CONFIG_VALUE, V4_BEEPER_BIT_MASK);
-  return ok;
-}
-
-static bool v4_beeper_pulse_once(uint32_t on_ms) {
-  if (!v4_beeper_update_bit(true)) {
-    return false;
-  }
-  vTaskDelay(pdMS_TO_TICKS(on_ms));
-  return v4_beeper_update_bit(false);
-}
-
+// Rev 4 board ownership lives in rev4_board.{h,cpp}.
+// Keep wrappers here so the rest of the sketch remains unchanged.
 void Beeper_Start(uint32_t on_ms, uint32_t off_ms, uint16_t repeat) {
-  portENTER_CRITICAL(&V4_BeeperMux);
-  V4_BeeperReqOnMs = on_ms;
-  V4_BeeperReqOffMs = off_ms;
-  V4_BeeperReqRepeat = repeat;
-  V4_BeeperStartReq = true;
-  portEXIT_CRITICAL(&V4_BeeperMux);
+  Rev4Board::BeeperStart(on_ms, off_ms, repeat);
 }
 
 void Beeper_Stop() {
-  portENTER_CRITICAL(&V4_BeeperMux);
-  V4_BeeperStopReq = true;
-  portEXIT_CRITICAL(&V4_BeeperMux);
-}
-
-static void V4_BeeperTask(void *pvParameters) {
-  (void)pvParameters;
-  v4_beeper_init();
-
-  uint32_t curOnMs = 0, curOffMs = 0;
-  uint16_t curRepeat = 0;  // 0 => infinite
-  uint16_t remaining = 0;
-  bool active = false;
-
-  for (;;) {
-    bool stopReq = false, startReq = false;
-    uint32_t reqOnMs = 0, reqOffMs = 0;
-    uint16_t reqRepeat = 0;
-
-    portENTER_CRITICAL(&V4_BeeperMux);
-    stopReq = V4_BeeperStopReq;
-    startReq = V4_BeeperStartReq;
-    reqOnMs = V4_BeeperReqOnMs;
-    reqOffMs = V4_BeeperReqOffMs;
-    reqRepeat = V4_BeeperReqRepeat;
-    if (stopReq) V4_BeeperStopReq = false;
-    if (startReq) V4_BeeperStartReq = false;
-    portEXIT_CRITICAL(&V4_BeeperMux);
-
-    if (stopReq) {
-      active = false;
-      v4_beeper_update_bit(false);
-    }
-
-    if (startReq) {
-      if (reqOnMs == 0) {
-        active = false;
-        v4_beeper_update_bit(false);
-      } else {
-        if (!(active && curOnMs == reqOnMs && curOffMs == reqOffMs && curRepeat == reqRepeat)) {
-          curOnMs = reqOnMs;
-          curOffMs = reqOffMs;
-          curRepeat = reqRepeat;
-          remaining = reqRepeat;  // 0 => infinite
-          active = true;
-        }
-      }
-    }
-
-    if (!active) {
-      vTaskDelay(pdMS_TO_TICKS(20));
-      continue;
-    }
-
-    if (!v4_beeper_pulse_once(curOnMs)) {
-      active = false;
-      continue;
-    }
-
-    if (curRepeat != 0) {
-      if (remaining > 0) {
-        remaining--;
-      }
-      if (remaining == 0) {
-        active = false;
-        continue;
-      }
-    }
-
-    if (curOffMs > 0) {
-      vTaskDelay(pdMS_TO_TICKS(curOffMs));
-    }
-  }
+  Rev4Board::BeeperStop();
 }
 
 void Beep(){
-  Beeper_Start(V4_BEEP_SHORT_MS, 0, 1); // short keypress beep
+  Rev4Board::BeepShort();
 }
 
 byte Dialog_Status; // global variable to store the Do_Show_Dialog screen Warning_Type (determines behaviour of the screen)
 lv_obj_t *Return_Screen;
 
 static void BacklightDialog_CancelPending(const char * reason) {
-  if (BacklightDialog_RequestPending && (reason != nullptr)) {
-    Serial.printf("Backlight dialog request cancelled: %s\n", reason);
-  }
+  (void)reason;
   BacklightDialog_RequestPending = false;
   BacklightDialog_RequestMillis = 0;
   BacklightDialog_GestureBusyUntil = 0;
   BacklightDialog_RequestScreen = nullptr;
 }
 
+static void ResumeUiUpdatesAfterSwipe(lv_timer_t * timer) {
+  if (g_ui_update_timer) {
+    lv_timer_resume(g_ui_update_timer);
+  }
+
+  g_ui_update_resume_timer = nullptr;
+  lv_timer_del(timer);
+}
+
+static void PauseUiUpdatesForSwipeAnimation() {
+  if (g_ui_update_timer) {
+    lv_timer_pause(g_ui_update_timer);
+  }
+
+  // Restart the resume timer if another touch or gesture happens quickly.
+  if (g_ui_update_resume_timer) {
+    lv_timer_del(g_ui_update_resume_timer);
+    g_ui_update_resume_timer = nullptr;
+  }
+
+  g_ui_update_resume_timer = lv_timer_create(ResumeUiUpdatesAfterSwipe, ScreenSwipePauseMs, nullptr);
+}
+
+static void ScreenTouchPreloadGuard(lv_event_t * e) {
+  (void)e;
+  PauseUiUpdatesForSwipeAnimation();
+}
+
 static void BacklightDialog_GestureGuard(lv_event_t * e) {
   (void)e;
+  PauseUiUpdatesForSwipeAnimation();
   BacklightDialog_GestureBusyUntil = millis() + BacklightDialog_GestureGuardMs;
   if (BacklightDialog_RequestPending && !BacklightDialog_Active) {
     BacklightDialog_CancelPending("gesture overlap");
@@ -275,6 +132,14 @@ static void BacklightDialog_GestureGuard(lv_event_t * e) {
 }
 
 static void RegisterBacklightDialogGuards() {
+  lv_obj_add_event_cb(ui_ScrWind, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+  lv_obj_add_event_cb(ui_ScrAutopilot, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+  lv_obj_add_event_cb(ui_ScrXTE, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+  lv_obj_add_event_cb(ui_ScrNav, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+  lv_obj_add_event_cb(ui_ScrAppWind, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+  lv_obj_add_event_cb(ui_ScrTruWind, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+  lv_obj_add_event_cb(ui_ScrInfo, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
+
   lv_obj_add_event_cb(ui_ScrWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
   lv_obj_add_event_cb(ui_ScrAutopilot, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
   lv_obj_add_event_cb(ui_ScrXTE, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
@@ -285,31 +150,49 @@ static void RegisterBacklightDialogGuards() {
 }
 
 #include <Preferences.h>  // esp32 library to write variables to flash
+#include "esp_system.h"
 Preferences FlashStorage; // to store calibrations in Flash
 int Unit_Initialise, Unit_Speed, Unit_Position, Unit_Distance, Unit_Wind, Unit_Depth, Unit_Wind_Damping, Unit_Heading_Damping;
 bool Unit_Silence_Alarm;
 
-void setup() {
-    Serial.begin(115200);
-    vTaskDelay(200);
+// One-shot startup reset support
+static constexpr int STARTUP_RESET_GPIO = 4;
+static constexpr uint32_t STARTUP_RESET_MAGIC = 0x5A17C0DE;
+static constexpr const char *STARTUP_RESET_NS = "powrst";
+static constexpr const char *STARTUP_KEY_MAGIC = "magic";
+static constexpr const char *STARTUP_KEY_SEQ = "seq";
+static constexpr const char *STARTUP_KEY_CSUM = "csum";
+static constexpr const char *STARTUP_KEY_BOOTS = "boots";
 
-    V4_ExpanderMutex = xSemaphoreCreateMutex();
-    if (V4_ExpanderMutex == nullptr) {
-      Serial.println("V4 expander mutex creation failed");
+static const char *startupResetReasonToString(esp_reset_reason_t reason);
+static uint32_t startupResetChecksumFor(uint32_t magic, uint32_t seq);
+static bool startupHasValidPendingRecord(uint32_t &seqOut);
+static void startupClearPendingRecord();
+static void startupArmPendingRecord(uint32_t seq);
+static void startupPrintState(const char *caption);
+static void startupHardwareResetNow(const char *why);
+static void handleOneShotStartupReset();
+
+void setup() {
+    Rev4Board::StartupPrepare();
+    vTaskDelay(100);
+    Beep();
+
+    //pinMode(STARTUP_RESET_GPIO, INPUT);
+    Serial.begin(115200);
+    vTaskDelay(100);
+    //handleOneShotStartupReset();
+
+    if (!Rev4Board::Begin()) {
+      Serial.println("V4 board init failed");
     }
 
-    ESP_Panel *panel = new ESP_Panel();
-    panel->init();
-#if LVGL_PORT_AVOID_TEAR
-    ESP_PanelBus_RGB *rgb_bus = static_cast<ESP_PanelBus_RGB *>(panel->getLcd()->getBus()); // When avoid tearing function is enabled, configure the RGB bus according to the LVGL configuration
-    rgb_bus->configRgbFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
-    rgb_bus->configRgbBounceBufferSize(LVGL_PORT_RGB_BOUNCE_BUFFER_SIZE);
-#endif
-    panel->begin();
+    if (!lvgl_port_init()) {
+      Serial.println("LVGL/display/touch init failed");
+      while (true) { delay(1000); }
+    }
 
-    lvgl_port_init(panel->getLcd(), panel->getTouch());
-
-    Serial.println("Mount FFat");   // this routine loads all images in Ffat to PSram, images need to be stored in a folder named assets in Ffat
+    // This routine loads all images in FFat to PSRAM; images must be stored in /assets.
     if (!FFat.begin(false, "/ffat", 10, "ffat")) {
         Serial.println("FFat mount FAILED");
     } else {
@@ -317,13 +200,16 @@ void setup() {
     }
     
     lvgl_port_lock(-1); /* Lock the mutex due to the LVGL APIs are not thread-safe */
-    ui_init();
-    RegisterBacklightDialogGuards();
-    if (!ui_assets_all_ok()) {
-        while (true) { delay(1000); }
-    }
-    lv_timer_handler();
-    lv_timer_create(ui_update_timer_cb, 100, NULL); // this sets refresh timing for all screens to display
+      ui_init();
+      RegisterBacklightDialogGuards();
+      if (!ui_assets_all_ok()) {
+          while (true) { delay(1000); }
+      }
+      lv_timer_handler();
+      g_ui_update_timer = lv_timer_create(ui_update_timer_cb, 100, NULL); // this sets refresh timing for all screens to display
+      Update_Unit_Labels();
+      lv_obj_add_state(ui_Track, LV_STATE_DISABLED);
+      lv_arc_set_change_rate (ui_CircularScale,1); // max change is 1 degrees per second
     lvgl_port_unlock(); /* Release the mutex */
     
     // Basic NMEA2000 node setup (talker + listener)
@@ -369,15 +255,159 @@ void setup() {
     Unit_Heading_Damping = 50;
     write_UnitSettings2Flash();
   }
-  Update_Unit_Labels();
-  lv_obj_add_state(ui_Track, LV_STATE_DISABLED);
-  lv_arc_set_change_rate (ui_CircularScale,1); // max change is 1 degrees per second
 
-  if (xTaskCreatePinnedToCore(V4_BeeperTask, "v4Beep", 2048, NULL, 1, &V4_BeeperTaskHandle, 1) != pdPASS) {
+  if (!Rev4Board::StartBeeperTask(1, 1, 2048)) {
     Serial.println("V4 beeper task creation failed");
   }
+  N2K::setUseCalculatedTrueWind(true);  // true means that calculated true wind TWS and TWA are calculated in the library, false means they are coming from NMEA2000 pgn's
 
   Serial.println("Setup Finished");
+}
+
+static const char *startupResetReasonToString(esp_reset_reason_t reason) {
+  switch (reason) {
+    case ESP_RST_UNKNOWN:    return "ESP_RST_UNKNOWN";
+    case ESP_RST_POWERON:    return "ESP_RST_POWERON";
+    case ESP_RST_EXT:        return "ESP_RST_EXT";
+    case ESP_RST_SW:         return "ESP_RST_SW";
+    case ESP_RST_PANIC:      return "ESP_RST_PANIC";
+    case ESP_RST_INT_WDT:    return "ESP_RST_INT_WDT";
+    case ESP_RST_TASK_WDT:   return "ESP_RST_TASK_WDT";
+    case ESP_RST_WDT:        return "ESP_RST_WDT";
+    case ESP_RST_DEEPSLEEP:  return "ESP_RST_DEEPSLEEP";
+    case ESP_RST_BROWNOUT:   return "ESP_RST_BROWNOUT";
+    case ESP_RST_SDIO:       return "ESP_RST_SDIO";
+    case ESP_RST_USB:        return "ESP_RST_USB";
+    case ESP_RST_JTAG:       return "ESP_RST_JTAG";
+    case ESP_RST_EFUSE:      return "ESP_RST_EFUSE";
+    case ESP_RST_PWR_GLITCH: return "ESP_RST_PWR_GLITCH";
+    case ESP_RST_CPU_LOCKUP: return "ESP_RST_CPU_LOCKUP";
+    default:                 return "UNRECOGNIZED";
+  }
+}
+
+static uint32_t startupResetChecksumFor(uint32_t magic, uint32_t seq) {
+  return magic ^ seq ^ 0xA5A55A5A;
+}
+
+static bool startupHasValidPendingRecord(uint32_t &seqOut) {
+  uint32_t magic = FlashStorage.getULong(STARTUP_KEY_MAGIC, 0);
+  uint32_t seq   = FlashStorage.getULong(STARTUP_KEY_SEQ, 0);
+  uint32_t csum  = FlashStorage.getULong(STARTUP_KEY_CSUM, 0);
+
+  if (magic != STARTUP_RESET_MAGIC) return false;
+  if (csum != startupResetChecksumFor(magic, seq)) return false;
+
+  seqOut = seq;
+  return true;
+}
+
+static void startupClearPendingRecord() {
+  FlashStorage.remove(STARTUP_KEY_MAGIC);
+  FlashStorage.remove(STARTUP_KEY_SEQ);
+  FlashStorage.remove(STARTUP_KEY_CSUM);
+}
+
+static void startupArmPendingRecord(uint32_t seq) {
+  FlashStorage.putULong(STARTUP_KEY_MAGIC, STARTUP_RESET_MAGIC);
+  FlashStorage.putULong(STARTUP_KEY_SEQ, seq);
+  FlashStorage.putULong(STARTUP_KEY_CSUM, startupResetChecksumFor(STARTUP_RESET_MAGIC, seq));
+}
+
+static void startupPrintState(const char *caption) {
+  uint32_t seq = 0;
+  bool valid = startupHasValidPendingRecord(seq);
+  uint32_t boots = FlashStorage.getULong(STARTUP_KEY_BOOTS, 0);
+
+  Serial.println();
+  Serial.println(caption);
+  Serial.print("  NVS boot counter   : ");
+  Serial.println(boots);
+  Serial.print("  Pending valid      : ");
+  Serial.println(valid ? "yes" : "no");
+  if (valid) {
+    Serial.print("  Pending sequence   : ");
+    Serial.println(seq);
+  }
+}
+
+static void startupHardwareResetNow(const char *why) {
+  Serial.println();
+  Serial.print("[ACTION] Hardware reset now: ");
+  Serial.println(why);
+  Serial.println("[ACTION] Waiting 0,25 second before pulling GPIO4 low -> EN low");
+  Serial.flush();
+  delay(250);
+
+  pinMode(STARTUP_RESET_GPIO, OUTPUT);
+  digitalWrite(STARTUP_RESET_GPIO, LOW);
+
+  while (true) { // normally we get reset before these statements
+    delay(250);
+  }
+}
+
+static void handleOneShotStartupReset() {
+  if (!FlashStorage.begin(STARTUP_RESET_NS, false)) {
+    Serial.println("[RESET] Cannot open startup reset NVS namespace; skipping one-shot reset logic.");
+    return;
+  }
+
+  uint32_t prevBoots = FlashStorage.getULong(STARTUP_KEY_BOOTS, 0);
+  uint32_t boots = prevBoots + 1;
+  FlashStorage.putULong(STARTUP_KEY_BOOTS, boots);
+
+  esp_reset_reason_t reason = esp_reset_reason();
+
+  Serial.println();
+  Serial.println("=== One-shot startup reset ===");
+  Serial.print("Reset reason enum    : ");
+  Serial.println((int)reason);
+  Serial.print("Reset reason text    : ");
+  Serial.println(startupResetReasonToString(reason));
+  Serial.print("Previous boot count  : ");
+  Serial.println(prevBoots);
+  Serial.print("Current  boot count  : ");
+  Serial.println(boots);
+
+  uint32_t pendingSeq = 0;
+  bool pendingValid = startupHasValidPendingRecord(pendingSeq);
+
+  if (!pendingValid) {
+    uint32_t nextSeq = boots + 1;
+
+    Serial.println();
+    Serial.println("[STATE] No valid pending record found.");
+    Serial.println("[STATE] Treating this as first boot after power-up or manual reset.");
+    Serial.println("[STATE] Arming one-shot marker for the next boot and forcing one extra hardware reset.");
+
+    startupArmPendingRecord(nextSeq);
+    startupPrintState("[DIAG] State after arming marker");
+    startupHardwareResetNow("first boot without pending marker");
+  }
+
+  Serial.println();
+  Serial.println("[STATE] Valid pending record found.");
+  Serial.print("[STATE] Pending sequence   : ");
+  Serial.println(pendingSeq);
+
+  if (pendingSeq == boots) {
+    Serial.println("[STATE] Marker matches current boot count.");
+    Serial.println("[STATE] This is the second boot after the forced one-shot reset.");
+    Serial.println("[STATE] Consuming marker and continuing normal operation.");
+    startupClearPendingRecord();
+    startupPrintState("[DIAG] State after consuming marker");
+  } else {
+    Serial.println("[WARN ] Marker is stale or inconsistent.");
+    Serial.println("[WARN ] Clearing it, arming a fresh marker for the next boot, and forcing one corrective hardware reset.");
+    startupClearPendingRecord();
+    uint32_t nextSeq = boots + 1;
+    startupArmPendingRecord(nextSeq);
+    startupPrintState("[DIAG] State after repairing marker");
+    startupHardwareResetNow("stale or inconsistent marker");
+  }
+
+  FlashStorage.end();
 }
 
 void loop() {
@@ -395,7 +425,7 @@ void write_UnitSettings2Flash(){
     FlashStorage.putInt("Unit_Wind", Unit_Wind);
     FlashStorage.putInt("Unit_Depth", Unit_Depth);
     FlashStorage.putInt("Unit_Wnd_Damp", Unit_Wind_Damping);
-    //FlashStorage.putInt("Unit_Hdng_Damp", Unit_Heading_Damping);
+    FlashStorage.putInt("Unit_Hdng_Damp", Unit_Heading_Damping);
     FlashStorage.putBool("Unit_Sil_Alm", Unit_Silence_Alarm);
     FlashStorage.end();
   }
@@ -571,7 +601,7 @@ const char* ConvertDepth2UnitSettings(float DepthVal, int Speed_Setting){
     case 1: // feet
       snprintf(BufStr, sizeof(BufStr), "%.0f", (double)DepthVal * 3.2808);
       break;
-    Default: 
+    default: 
       snprintf(BufStr, sizeof(BufStr), "%f", DepthVal);
       break;  
   }
@@ -1085,10 +1115,11 @@ void Do_Update_ScrAutopilot(){
       case N2K::AP_MODE_STANDBY:
       case N2K::AP_MODE_UNKNOWN : { // detect ap standby mode OR unknown (=no autopilot) and set buttons accordingly
         lv_label_set_text(ui_AutopilotHeading, "---°");
-        if (lv_obj_has_state(ui_Auto, LV_STATE_USER_1) | lv_obj_has_state(ui_Wind, LV_STATE_USER_1) | lv_obj_has_state(ui_Track, LV_STATE_USER_1)) // if we are in standby and one of the autopilot buttons is active
+        if (lv_obj_has_state(ui_Auto, LV_STATE_USER_1) || lv_obj_has_state(ui_Wind, LV_STATE_USER_1) || lv_obj_has_state(ui_Track, LV_STATE_USER_1)) { // if we are in standby and one of the autopilot buttons is active
           lv_obj_clear_state(ui_Wind, LV_STATE_USER_1); // if Auto is active then wind is not active
           lv_obj_clear_state(ui_Track, LV_STATE_USER_1); // if Auto is active then track is not active
           lv_obj_clear_state(ui_Auto, LV_STATE_USER_1);
+        }
       } break;
     }
   }
@@ -1141,7 +1172,9 @@ void Do_Update_ScrWind(){
 }
 
 void Do_Update_ScrAppWind() {
+    bool ShowWarning = false;
     char BufStr[48];
+    int Buf;
     const char* ShortSpeedUnitStr;
 
     if (strcmp(SpeedUnitStr, "knots") == 0) ShortSpeedUnitStr = "kn";
@@ -1166,8 +1199,29 @@ void Do_Update_ScrAppWind() {
       else                  snprintf(BufStr, sizeof(BufStr), "SOG ---%s", ShortSpeedUnitStr);
     lv_label_set_text(ui_GroundSpeed, BufStr); 
 
-    if (N2K::hasFreshAWA()) lv_img_set_angle(ui_AWAneedle, 10 * N2K::awaSmoothed());
-      else                  lv_img_set_angle(ui_AWAneedle, 0);
+    if (N2K::hasFreshAWA()){
+      Buf = 10 * N2K::awaSmoothed();
+      if (!lv_obj_has_state(ui_AWAscaletoggle, LV_STATE_CHECKED)){ // if true, the normal AWA display is active
+        lv_obj_add_flag(ui_Warning, LV_OBJ_FLAG_HIDDEN);
+        lv_img_set_angle(ui_AWAneedle, Buf);  // for normal wind panel
+      }
+      else {
+        Buf = 3 * Buf;    // close haul is 3x more sensitive than normal display
+        if ((Buf >= 1800) && (Buf < 9000)) {
+          Buf = 1800;            // dead zone for angles >60 on starboard
+          ShowWarning = true;
+        }
+        if (Buf >= 9000) Buf = Buf-7200;                          // dead zone for angles >60 on port
+        if (Buf > 10800) {
+          Buf = 10800;
+          ShowWarning = true;
+        }
+        if (ShowWarning) lv_obj_clear_flag(ui_Warning, LV_OBJ_FLAG_HIDDEN);
+          else lv_obj_add_flag(ui_Warning, LV_OBJ_FLAG_HIDDEN);
+        lv_img_set_angle(ui_AWAneedle, Buf);                      // for close haul wind panel
+      }
+    }
+    else lv_img_set_angle(ui_AWAneedle, 0);
 
     if (N2K::hasFreshAWS()) lv_label_set_text(ui_AWS, ConvertSpeed2UnitSettings(N2K::awsSmoothed(), Unit_Wind));
       else                  lv_label_set_text(ui_AWS, "---");
@@ -1284,8 +1338,6 @@ void Do_Update_ScrInfo(){
 }
 
 static void ui_update_timer_cb(lv_timer_t * timer) {
-  N2K::setUseCalculatedTrueWind(true);  // true means that calculated true wind TWS and TWA are calculated in the library, false means they are coming from NMEA2000 pgn's
-
   lv_obj_t *ActScr = lv_scr_act();
   if (ActScr == ui_ScrAutopilot) {
       Do_Update_ScrAutopilot();
@@ -1350,9 +1402,9 @@ static void ui_update_timer_cb(lv_timer_t * timer) {
       int16_t sliderValue = lv_slider_get_value(ui_BacklightSlider);
       if (sliderValue != V4_LastBacklightSliderValue) {
         V4_LastBacklightSliderValue = sliderValue;
-        v4_expander_write_reg(V4_BACKLIGHT_REG, 255 - uint8_t(sliderValue)); // only update brightness when the slider value changes
+        uint8_t pwm = Rev4Board::SliderValueToBacklightPwm(sliderValue);
+        Rev4Board::SetBacklightPwm(pwm);
       }
     }
   }
 }
-

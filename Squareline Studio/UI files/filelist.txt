@@ -22,8 +22,11 @@ ui_img_indicator_png.c
 ui_img_helmman_png.c
 ui_img_boat_png.c
 ui_img_1883567225.c
+ui_img_zoomin_png.c
 ui_img_windcontour_png.c
+ui_img_circcaleclosehaul_png.c
 ui_img_needle_png.c
+ui_img_warning_png.c
 ui_img_settings_png.c
 ui_img_ok_png.c
 ui_img_cancel_png.c
@@ -31,7 +34,7 @@ ui_img_turn_starboard_png.c
 ui_img_brightness_png.c
 ui_img_error_png.c
 ui_img_error2_png.c
-ui_img_warning_png.c
+ui_img_zoomout_png.c
 ui_img_turn_port_png.c
 fonts/ui_font_Arial60.c
 fonts/ui_font_Arial90.c

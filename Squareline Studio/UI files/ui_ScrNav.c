@@ -10,8 +10,6 @@ lv_obj_t * ui_APmode1;
 lv_obj_t * ui_SpeedLbl1;
 lv_obj_t * ui_STW;
 lv_obj_t * ui_HDG;
-lv_obj_t * ui_Time;
-lv_obj_t * ui_Date;
 lv_obj_t * ui_PosLbl;
 lv_obj_t * ui_Lon;
 lv_obj_t * ui_Lat;
@@ -23,10 +21,6 @@ lv_obj_t * ui_Lat = NULL;
 lv_obj_t * ui_Lon = NULL;
 lv_obj_t * ui_Label12 = NULL;
 lv_obj_t * ui_PosLbl = NULL;
-lv_obj_t * ui_Timepanel = NULL;
-lv_obj_t * ui_Label14 = NULL;
-lv_obj_t * ui_Date = NULL;
-lv_obj_t * ui_Time = NULL;
 lv_obj_t * ui_HDGpanel = NULL;
 lv_obj_t * ui_Label16 = NULL;
 lv_obj_t * ui_HDG = NULL;
@@ -44,11 +38,11 @@ void ui_event_ScrNav(lv_event_t * e)
 
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_RIGHT) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 700, 0, &ui_ScrAutopilot_screen_init);
+        _ui_screen_change(&ui_ScrAutopilot, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, &ui_ScrAutopilot_screen_init);
     }
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT) {
         lv_indev_wait_release(lv_indev_get_act());
-        _ui_screen_change(&ui_ScrWind, LV_SCR_LOAD_ANIM_MOVE_LEFT, 700, 0, &ui_ScrWind_screen_init);
+        _ui_screen_change(&ui_ScrWind, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, &ui_ScrWind_screen_init);
     }
     if(event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_TOP) {
         lv_indev_wait_release(lv_indev_get_act());
@@ -68,7 +62,7 @@ void ui_event_ScrNav(lv_event_t * e)
 void ui_ScrNav_screen_init(void)
 {
     ui_ScrNav = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_ScrNav, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_clear_flag(ui_ScrNav, LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM);      /// Flags
 
     ui_POSpanel = lv_obj_create(ui_ScrNav);
     lv_obj_set_width(ui_POSpanel, 460);
@@ -139,54 +133,9 @@ void ui_ScrNav_screen_init(void)
     lv_obj_set_x(ui_PosLbl, 128);
     lv_obj_set_y(ui_PosLbl, 162);
     lv_label_set_text(ui_PosLbl, "DDM: Degrees Decimal Minutes");
+    lv_obj_clear_flag(ui_PosLbl, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_align(ui_PosLbl, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_Timepanel = lv_obj_create(ui_ScrNav);
-    lv_obj_set_width(ui_Timepanel, 238);
-    lv_obj_set_height(ui_Timepanel, 238);
-    lv_obj_set_x(ui_Timepanel, 497);
-    lv_obj_set_y(ui_Timepanel, 61);
-    lv_obj_clear_flag(ui_Timepanel, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE |
-                      LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
-                      LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-    lv_obj_set_style_border_color(ui_Timepanel, lv_color_hex(0x6A6D6A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_opa(ui_Timepanel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_Label14 = lv_label_create(ui_Timepanel);
-    lv_obj_set_width(ui_Label14, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Label14, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Label14, -8);
-    lv_obj_set_y(ui_Label14, -11);
-    lv_label_set_text(ui_Label14, "Date - Time:");
-    lv_obj_clear_flag(ui_Label14, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-
-    ui_Date = lv_label_create(ui_Timepanel);
-    lv_obj_set_width(ui_Date, 230);
-    lv_obj_set_height(ui_Date, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Date, -1);
-    lv_obj_set_y(ui_Date, 9);
-    lv_obj_set_align(ui_Date, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Date, "12:43");
-    lv_obj_clear_flag(ui_Date, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-    lv_obj_set_style_text_align(ui_Date, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_Date, &ui_font_Arial60, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_Time = lv_label_create(ui_Timepanel);
-    lv_obj_set_width(ui_Time, 230);
-    lv_obj_set_height(ui_Time, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Time, -5);
-    lv_obj_set_y(ui_Time, 73);
-    lv_obj_set_align(ui_Time, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Time, "12:43");
-    lv_obj_clear_flag(ui_Time, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-    lv_obj_set_style_text_align(ui_Time, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_Time, &ui_font_Arial60, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_HDGpanel = lv_obj_create(ui_ScrNav);
     lv_obj_set_width(ui_HDGpanel, 225);
@@ -304,7 +253,8 @@ void ui_ScrNav_screen_init(void)
     lv_obj_set_align(ui_APmode1, LV_ALIGN_CENTER);
     lv_label_set_text(ui_APmode1, "--------");
     lv_obj_clear_flag(ui_APmode1, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                      LV_OBJ_FLAG_SNAPPABLE);     /// Flags
+                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                      LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_font(ui_APmode1, &lv_font_montserrat_42, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_AutopilotHeading1 = lv_label_create(ui_POSpanel4);
@@ -325,8 +275,6 @@ void ui_ScrNav_screen_init(void)
     ui_Lat = ui_Lat;
     ui_Lon = ui_Lon;
     ui_PosLbl = ui_PosLbl;
-    ui_Date = ui_Date;
-    ui_Time = ui_Time;
     ui_HDG = ui_HDG;
     ui_STW = ui_STW;
     ui_SpeedLbl1 = ui_SpeedLbl1;
@@ -351,12 +299,6 @@ void ui_ScrNav_screen_destroy(void)
     ui_Label12 = NULL;
     ui_PosLbl = NULL;
     ui_PosLbl = NULL;
-    ui_Timepanel = NULL;
-    ui_Label14 = NULL;
-    ui_Date = NULL;
-    ui_Date = NULL;
-    ui_Time = NULL;
-    ui_Time = NULL;
     ui_HDGpanel = NULL;
     ui_Label16 = NULL;
     ui_HDG = NULL;
