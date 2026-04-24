@@ -41,7 +41,7 @@ I have included a flash file for Version 3 boards, but not the full source packa
 
 - No backlight control
 - Power-up is not automatic; you need to use the power key
-I also do not plan further updates to the V3 version anymore !!
+- I also do not plan further updates to the V3 version anymore !!
 
 ## Screenshots
 
@@ -118,7 +118,7 @@ This also affects which version of **SquareLine Studio** you can use, because re
 
 **Modifying this project is not for beginners.**
 
-#Remark on last version of the program:
+## Remark on last version of the program:
 In the software there is a provision for a board mod. I developped this mod because when i powered my board from the NMEA network it needed a push on the reset button to start.
 This mod solves that problem. In the main ino sketch lines 181 and 184 need to be uncommented if you use a modded board.
 If you don't encounter the problem i had, there is NO NEED TO MOD THE BOARD.
