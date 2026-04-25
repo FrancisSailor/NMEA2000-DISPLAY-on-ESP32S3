@@ -54,7 +54,7 @@ void ui_event_SettingsCancel(lv_event_t * e)
 
     if(event_code == LV_EVENT_LONG_PRESSED) {
         _ui_screen_change(&ui_ScrInfo, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_ScrInfo_screen_init);
-        CancelSettings(e);
+        BeepOnce(e);
     }
 }
 

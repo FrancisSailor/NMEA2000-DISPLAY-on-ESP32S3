@@ -33,12 +33,13 @@
 tNMEA2000 &NMEA2000 = *(new NMEA2000_esp32_twai());
 #include <n2k.h>
 
+void DoSetBacklight(lv_event_t * e);
 static void ui_update_timer_cb(lv_timer_t * timer); // create a timer for display-related UI refresh work; the LVGL task itself is pinned in lvgl_arduino_v4.cpp
 static void BacklightDialog_CancelPending(const char * reason = nullptr);
 static void BacklightDialog_GestureGuard(lv_event_t * e);
-static void ScreenTouchPreloadGuard(lv_event_t * e);
+static void BacklightDialog_LongPressGuard(lv_event_t * e);
+static void BacklightDialog_ResetInputState();
 static void PauseUiUpdatesForSwipeAnimation();
-static void ResumeUiUpdatesAfterSwipe(lv_timer_t * timer);
 static void RegisterBacklightDialogGuards();
 
 uint32_t Touch_Button_Clamp = 1000, Button_Clamp_millis; //Touch_Button_Clamp clamps the touchbutton state for the number of millis specified, to give time at the AP to conform the status set by the buttons
@@ -66,6 +67,7 @@ static constexpr uint32_t BacklightDialog_GestureGuardMs = 850;
 static constexpr uint32_t ScreenSwipePauseMs = 550;  // slightly longer than the 500 ms screen swipe animation
 static lv_timer_t *g_ui_update_timer = nullptr;
 static lv_timer_t *g_ui_update_resume_timer = nullptr;
+static bool g_pause_live_screen_updates = false;
 
 static int16_t V4_LastBacklightSliderValue = -1;
 
@@ -94,61 +96,46 @@ static void BacklightDialog_CancelPending(const char * reason) {
   BacklightDialog_RequestScreen = nullptr;
 }
 
-static void ResumeUiUpdatesAfterSwipe(lv_timer_t * timer) {
-  if (g_ui_update_timer) {
-    lv_timer_resume(g_ui_update_timer);
-  }
-
-  g_ui_update_resume_timer = nullptr;
-  lv_timer_del(timer);
-}
-
-static void PauseUiUpdatesForSwipeAnimation() {
-  if (g_ui_update_timer) {
-    lv_timer_pause(g_ui_update_timer);
-  }
-
-  // Restart the resume timer if another touch or gesture happens quickly.
-  if (g_ui_update_resume_timer) {
-    lv_timer_del(g_ui_update_resume_timer);
-    g_ui_update_resume_timer = nullptr;
-  }
-
-  g_ui_update_resume_timer = lv_timer_create(ResumeUiUpdatesAfterSwipe, ScreenSwipePauseMs, nullptr);
-}
-
-static void ScreenTouchPreloadGuard(lv_event_t * e) {
-  (void)e;
-  PauseUiUpdatesForSwipeAnimation();
-}
-
 static void BacklightDialog_GestureGuard(lv_event_t * e) {
   (void)e;
-  PauseUiUpdatesForSwipeAnimation();
   BacklightDialog_GestureBusyUntil = millis() + BacklightDialog_GestureGuardMs;
   if (BacklightDialog_RequestPending && !BacklightDialog_Active) {
     BacklightDialog_CancelPending("gesture overlap");
   }
 }
 
-static void RegisterBacklightDialogGuards() {
-  lv_obj_add_event_cb(ui_ScrWind, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-  lv_obj_add_event_cb(ui_ScrAutopilot, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-  lv_obj_add_event_cb(ui_ScrXTE, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-  lv_obj_add_event_cb(ui_ScrNav, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-  lv_obj_add_event_cb(ui_ScrAppWind, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-  lv_obj_add_event_cb(ui_ScrTruWind, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-  lv_obj_add_event_cb(ui_ScrInfo, ScreenTouchPreloadGuard, LV_EVENT_PRESSED, NULL);
-
-  lv_obj_add_event_cb(ui_ScrWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-  lv_obj_add_event_cb(ui_ScrAutopilot, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-  lv_obj_add_event_cb(ui_ScrXTE, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-  lv_obj_add_event_cb(ui_ScrNav, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-  lv_obj_add_event_cb(ui_ScrAppWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-  lv_obj_add_event_cb(ui_ScrTruWind, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-  lv_obj_add_event_cb(ui_ScrInfo, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+static void BacklightDialog_ResetInputState() {
+  lv_indev_t * indev = lv_indev_get_act();
+  if (indev != nullptr) {
+    lv_indev_reset(indev, nullptr);
+  }
 }
 
+static void BacklightDialog_LongPressGuard(lv_event_t * e) {
+  DoSetBacklight(e);
+}
+
+static void RegisterBacklightDialogGuards() {
+  lv_obj_t * screens[] = {
+    ui_ScrWind,
+    ui_ScrAutopilot,
+    ui_ScrXTE,
+    ui_ScrNav,
+    ui_ScrAppWind,
+    ui_ScrTruWind,
+    ui_ScrInfo
+  };
+
+  for (size_t i = 0; i < (sizeof(screens) / sizeof(screens[0])); ++i) {
+    lv_obj_t * scr = screens[i];
+    if (scr == nullptr) continue;
+
+    lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_add_event_cb(scr, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(scr, BacklightDialog_LongPressGuard, LV_EVENT_LONG_PRESSED, NULL);
+  }
+}
 #include <Preferences.h>  // esp32 library to write variables to flash
 #include "esp_system.h"
 Preferences FlashStorage; // to store calibrations in Flash
@@ -528,7 +515,7 @@ void read_UnitSettings2Flash(){
   Update_Unit_Labels();
 }
 
-void CancelSettings(lv_event_t * e) { // Cancel button press event on settings screen, just beeps
+void BeepOnce(lv_event_t * e) { // button press event on settings screen, just beeps
   Beep();
 }
 
@@ -889,16 +876,17 @@ void DoSetBacklight(lv_event_t * e){  // is triggered by long press event on a s
     return;
   }
 
+  // A valid LV_EVENT_LONG_PRESSED is already a settled hold, not a swipe.
+  // Open the backlight dialog immediately instead of deferring through
+  // ui_update_timer_cb(); otherwise the pending request can be cancelled by
+  // screen/touch timing and the dialog may only work once after reset.
+  g_pause_live_screen_updates = false;
+  BacklightDialog_CancelPending("direct long press open");
   BacklightDialog_RequestScreen = ActScr;
-
-  lv_indev_t * indev = lv_indev_get_act();
-  if (indev != NULL) {
-    lv_indev_wait_release(indev);
-  }
-
-  BacklightDialog_RequestPending = true;
-  BacklightDialog_RequestMillis = millis();
-  BacklightDialog_GestureBusyUntil = BacklightDialog_RequestMillis + BacklightDialog_TouchSettleMs;
+  BacklightDialog_Active = true;
+  oldBacklightDialog_Active = false;
+  Do_Show_SetBacklight();
+  BacklightDialog_Timeout = millis();
 }
 
 void Do_Show_SetBacklight() {
@@ -1339,21 +1327,26 @@ void Do_Update_ScrInfo(){
 
 static void ui_update_timer_cb(lv_timer_t * timer) {
   lv_obj_t *ActScr = lv_scr_act();
-  if (ActScr == ui_ScrAutopilot) {
-      Do_Update_ScrAutopilot();
-  } else if (ActScr == ui_ScrWind) {
-      Do_Update_ScrWind();
-  } else if (ActScr == ui_ScrNav) {
-      Do_Update_ScrNav();
-  } else if (ActScr == ui_ScrXTE) {
-      Do_Update_ScrXTE();
-  } else if (ActScr == ui_ScrAppWind) {
-      Do_Update_ScrAppWind();
-  } else if (ActScr == ui_ScrTruWind){
-      Do_Update_ScrTruWind();       
-  } else if (ActScr == ui_ScrInfo){
-      Do_Update_ScrInfo();   
-  } else if (ActScr == ui_DialogScr){
+
+  if (!g_pause_live_screen_updates) {
+    if (ActScr == ui_ScrAutopilot) {
+        Do_Update_ScrAutopilot();
+    } else if (ActScr == ui_ScrWind) {
+        Do_Update_ScrWind();
+    } else if (ActScr == ui_ScrNav) {
+        Do_Update_ScrNav();
+    } else if (ActScr == ui_ScrXTE) {
+        Do_Update_ScrXTE();
+    } else if (ActScr == ui_ScrAppWind) {
+        Do_Update_ScrAppWind();
+    } else if (ActScr == ui_ScrTruWind){
+        Do_Update_ScrTruWind();       
+    } else if (ActScr == ui_ScrInfo){
+        Do_Update_ScrInfo();   
+    }
+  }
+
+  if (ActScr == ui_DialogScr){
       Do_Update_ScrDialog();       
   }
 
@@ -1396,8 +1389,11 @@ static void ui_update_timer_cb(lv_timer_t * timer) {
     }
     else { // here the backlight dialog was already active, in this pasrt we set the screen brightness and watch a timeout of this dialog
       if (millis() >= (BacklightDialog_Timeout + 5000)) {// brightness dialog stays on screen for 5 seconds
-        BacklightDialog_Active = false; // we deactivate the backlight doialog and return to the main screen
-        lv_disp_load_scr(Return_Screen); // display the screen which was active before the dialog screen was displayed
+        BacklightDialog_Active = false; // we deactivate the backlight dialog and return to the main screen
+        oldBacklightDialog_Active = false; // reset the one-shot visibility latch for the next long press
+        BacklightDialog_RequestScreen = nullptr;
+        BacklightDialog_ResetInputState();
+        lv_scr_load(Return_Screen); // display the screen which was active before the dialog screen was displayed
       }
       int16_t sliderValue = lv_slider_get_value(ui_BacklightSlider);
       if (sliderValue != V4_LastBacklightSliderValue) {
