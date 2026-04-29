@@ -37,7 +37,6 @@ void DoSetBacklight(lv_event_t * e);
 static void ui_update_timer_cb(lv_timer_t * timer); // create a timer for display-related UI refresh work; the LVGL task itself is pinned in lvgl_arduino_v4.cpp
 static void BacklightDialog_CancelPending(const char * reason = nullptr);
 static void BacklightDialog_GestureGuard(lv_event_t * e);
-static void BacklightDialog_LongPressGuard(lv_event_t * e);
 static void BacklightDialog_ResetInputState();
 static void PauseUiUpdatesForSwipeAnimation();
 static void RegisterBacklightDialogGuards();
@@ -62,7 +61,7 @@ static bool BacklightDialog_RequestPending = false;
 static uint32_t BacklightDialog_RequestMillis = 0;
 static uint32_t BacklightDialog_GestureBusyUntil = 0;
 static lv_obj_t *BacklightDialog_RequestScreen = nullptr;
-static constexpr uint32_t BacklightDialog_TouchSettleMs = 120;
+static constexpr uint32_t BacklightDialog_TouchSettleMs = 180;
 static constexpr uint32_t BacklightDialog_GestureGuardMs = 850;
 static constexpr uint32_t ScreenSwipePauseMs = 550;  // slightly longer than the 500 ms screen swipe animation
 static lv_timer_t *g_ui_update_timer = nullptr;
@@ -111,10 +110,6 @@ static void BacklightDialog_ResetInputState() {
   }
 }
 
-static void BacklightDialog_LongPressGuard(lv_event_t * e) {
-  DoSetBacklight(e);
-}
-
 static void RegisterBacklightDialogGuards() {
   lv_obj_t * screens[] = {
     ui_ScrWind,
@@ -133,7 +128,9 @@ static void RegisterBacklightDialogGuards() {
     lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
 
     lv_obj_add_event_cb(scr, BacklightDialog_GestureGuard, LV_EVENT_GESTURE, NULL);
-    lv_obj_add_event_cb(scr, BacklightDialog_LongPressGuard, LV_EVENT_LONG_PRESSED, NULL);
+    // Long press is assigned to DoSetBacklight() in SquareLine Studio.
+    // Do not add another LV_EVENT_LONG_PRESSED handler here, otherwise the
+    // backlight dialog can fire too aggressively and interfere with swipes.
   }
 }
 #include <Preferences.h>  // esp32 library to write variables to flash
@@ -165,10 +162,10 @@ void setup() {
     vTaskDelay(100);
     Beep();
 
-    //pinMode(STARTUP_RESET_GPIO, INPUT);
+    //pinMode(STARTUP_RESET_GPIO, INPUT);  // if you have a modded board uncomment this
     Serial.begin(115200);
     vTaskDelay(100);
-    //handleOneShotStartupReset();
+    //handleOneShotStartupReset();  // if you have a modded board uncomment this
 
     if (!Rev4Board::Begin()) {
       Serial.println("V4 board init failed");
@@ -876,19 +873,13 @@ void DoSetBacklight(lv_event_t * e){  // is triggered by long press event on a s
     return;
   }
 
-  // A valid LV_EVENT_LONG_PRESSED is already a settled hold, not a swipe.
-  // Open the backlight dialog immediately instead of deferring through
-  // ui_update_timer_cb(); otherwise the pending request can be cancelled by
-  // screen/touch timing and the dialog may only work once after reset.
-  g_pause_live_screen_updates = false;
-  BacklightDialog_CancelPending("direct long press open");
+  // Defer opening the dialog briefly so a slow swipe/drag has time to be
+  // classified as LV_EVENT_GESTURE and cancel the pending backlight request.
   BacklightDialog_RequestScreen = ActScr;
-  BacklightDialog_Active = true;
-  oldBacklightDialog_Active = false;
-  Do_Show_SetBacklight();
-  BacklightDialog_Timeout = millis();
+  BacklightDialog_RequestMillis = millis();
+  BacklightDialog_GestureBusyUntil = millis() + BacklightDialog_TouchSettleMs;
+  BacklightDialog_RequestPending = true;
 }
-
 void Do_Show_SetBacklight() {
   //Beep();   //This beep interacts with other i2c traffic and causes occasional problems
   oldBacklightDialog_Active = true; // block successive calls to this routine
@@ -1364,7 +1355,8 @@ static void ui_update_timer_cb(lv_timer_t * timer) {
   if (BacklightDialog_RequestPending) {
     if (N2K::apHasAlarm() || N2K::apHasWarning()) {
       BacklightDialog_CancelPending("alarm/warning took priority");
-    } else if (millis() >= BacklightDialog_GestureBusyUntil) {
+    } else if ((millis() - BacklightDialog_RequestMillis >= BacklightDialog_TouchSettleMs) &&
+               (millis() >= BacklightDialog_GestureBusyUntil)) {
       lv_obj_t *CurrentScr = lv_scr_act();
       if ((BacklightDialog_RequestScreen != nullptr) && (CurrentScr != BacklightDialog_RequestScreen)) {
         BacklightDialog_CancelPending("screen changed before dialog open");
