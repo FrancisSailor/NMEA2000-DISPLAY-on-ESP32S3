@@ -42,7 +42,7 @@ void ui_event_SettingsOk(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_LONG_PRESSED) {
+    if(event_code == LV_EVENT_RELEASED) {
         _ui_screen_change(&ui_ScrInfo, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_ScrInfo_screen_init);
         StoreUnitSettings(e);
     }
@@ -52,9 +52,9 @@ void ui_event_SettingsCancel(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_LONG_PRESSED) {
+    if(event_code == LV_EVENT_RELEASED) {
         _ui_screen_change(&ui_ScrInfo, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_ScrInfo_screen_init);
-        BeepOnce(e);
+        CancelUnitSettings(e);
     }
 }
 

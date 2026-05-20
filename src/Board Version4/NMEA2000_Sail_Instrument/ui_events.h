@@ -21,6 +21,7 @@ void Wind_pressed(lv_event_t * e);
 void BeepOnce(lv_event_t * e);
 void DoInitSettingsScr(lv_event_t * e);
 void StoreUnitSettings(lv_event_t * e);
+void CancelUnitSettings(lv_event_t * e);
 void DialogOK(lv_event_t * e);
 void DialogCancel(lv_event_t * e);
 

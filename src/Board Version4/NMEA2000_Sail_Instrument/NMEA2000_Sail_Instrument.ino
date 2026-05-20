@@ -32,6 +32,7 @@
 #include <NMEA2000.h>
 tNMEA2000 &NMEA2000 = *(new NMEA2000_esp32_twai());
 #include <n2k.h>
+//#include <N2Kwifi.h>  // when working over wifi, uncomment this line and also uncomment lines 525, 526, 544, 545, 551, 552
 
 void DoSetBacklight(lv_event_t * e);
 static void ui_update_timer_cb(lv_timer_t * timer); // create a timer for display-related UI refresh work; the LVGL task itself is pinned in lvgl_arduino_v4.cpp
@@ -45,7 +46,7 @@ uint32_t Touch_Button_Clamp = 1000, Button_Clamp_millis; //Touch_Button_Clamp cl
 
 // contain the abbreviations of the units chosen in the settings panel (avoid Arduino String to reduce heap churn)
 char WindUnitStr[8] = "";
-char WindUnitStr2[3] = "";      // first two characters of WindUnitStr (used where the original code did substring(0,2))
+char WindUnitStr2[8] = "";      // first two characters of WindUnitStr if it is knots, else WindUnitStr2 is the same as WindUnitStr
 char SpeedUnitStr[8] = "";
 char DepthUnitStr[4] = "";
 char DistanceUnitStr[4] = "";
@@ -162,10 +163,10 @@ void setup() {
     vTaskDelay(100);
     Beep();
 
-    //pinMode(STARTUP_RESET_GPIO, INPUT);  // if you have a modded board uncomment this
+//    pinMode(STARTUP_RESET_GPIO, INPUT);  // if you have a modded board uncomment this
     Serial.begin(115200);
     vTaskDelay(100);
-    //handleOneShotStartupReset();  // if you have a modded board uncomment this
+//    handleOneShotStartupReset();  // if you have a modded board uncomment this
 
     if (!Rev4Board::Begin()) {
       Serial.println("V4 board init failed");
@@ -434,9 +435,13 @@ void Update_Unit_Labels() { // updates all labels on all screens when units are 
 
     WindUnitStr[sizeof(WindUnitStr) - 1] = '\0';
     // Maintain original behavior of WindUnitStr.substring(0,2)
-    WindUnitStr2[0] = WindUnitStr[0];
-    WindUnitStr2[1] = WindUnitStr[1] ? WindUnitStr[1] : '\0';
-    WindUnitStr2[2] = '\0';
+    if (Unit_Wind == 0) {
+      WindUnitStr2[0] = WindUnitStr[0];
+      WindUnitStr2[1] = WindUnitStr[1] ? WindUnitStr[1] : '\0';
+      WindUnitStr2[2] = '\0';
+    }
+    else
+      strncpy(WindUnitStr2, WindUnitStr, sizeof(WindUnitStr));
 
     switch (Unit_Speed) {
       case 0: 
@@ -517,6 +522,9 @@ void BeepOnce(lv_event_t * e) { // button press event on settings screen, just b
 }
 
 void StoreUnitSettings(lv_event_t * e) { // OK button press event on settings screen: Store Unit Settings in Flash memory
+  // if (N2K::isSetupPortalActive()) // if the AP wifi settings portal was  active, we should deactivate it on leaving the settings screen
+  //   N2K::stopSetupPortal(); // only used if the input data comes from wifi, we have to build a check here that stops using this if we are using physical NMEA2000 connection
+  
     Beep();
     Unit_Initialise = 444;
     Unit_Speed = lv_dropdown_get_selected(ui_SpeedDropdown);
@@ -532,7 +540,17 @@ void StoreUnitSettings(lv_event_t * e) { // OK button press event on settings sc
     Update_Unit_Labels();
 }
 
+void CancelUnitSettings(lv_event_t * e) { // Cancel button press event on settings screen: Quit Settings Screen
+  // if (N2K::isSetupPortalActive()) // if the AP wifi settings portal was  active, we should deactivate it on leaving the settings screen
+  //   N2K::stopSetupPortal(); // only used if the input data comes from wifi, we have to build a check here that stops using this if we are using physical NMEA2000 connection
+  
+    Beep();
+}
+
 void DoInitSettingsScr(lv_event_t * e){  // is called before displaying the settings screen
+  // if (!N2K::isSetupPortalActive())  // if the AP wifi settings portal was not active, we should activate it.
+  //   N2K::startSetupPortal(); // only used if the input data comes from wifi, we have to build a check here that stops using this if we are using physical NMEA2000 connection
+  
   read_UnitSettings2Flash();
   lv_dropdown_set_selected(ui_SpeedDropdown, Unit_Speed);
   lv_dropdown_set_selected(ui_PostionDropdown, Unit_Position);
@@ -880,6 +898,7 @@ void DoSetBacklight(lv_event_t * e){  // is triggered by long press event on a s
   BacklightDialog_GestureBusyUntil = millis() + BacklightDialog_TouchSettleMs;
   BacklightDialog_RequestPending = true;
 }
+
 void Do_Show_SetBacklight() {
   //Beep();   //This beep interacts with other i2c traffic and causes occasional problems
   oldBacklightDialog_Active = true; // block successive calls to this routine
@@ -1059,12 +1078,17 @@ void Do_Update_ScrAutopilot(){
 
       case N2K::AP_MODE_WIND: {
         Windangle = N2K::apWindAngleTarget();
-        if (Windangle > 0) Tack = "S";
-        else if (Windangle < 0) Tack = "P";
-        else Tack="";
 
-        snprintf(BufStr, sizeof(BufStr), "%.0f%s", (double)fabs(Windangle), Tack);
-        lv_label_set_text(ui_AutopilotHeading, BufStr);
+        if (!isfinite(Windangle)) {
+          lv_label_set_text(ui_AutopilotHeading, "---");
+        } else {
+          if (Windangle > 0) Tack = "S";
+          else if (Windangle < 0) Tack = "P";
+          else Tack="";
+
+          snprintf(BufStr, sizeof(BufStr), "%.0f%s", (double)fabs(Windangle), Tack);
+          lv_label_set_text(ui_AutopilotHeading, BufStr);
+        }
         
         Windangle = N2K::awaSmoothed();
         if (Windangle > 180) {
@@ -1084,8 +1108,14 @@ void Do_Update_ScrAutopilot(){
       case N2K::AP_MODE_PRE_TRACK: 
       case N2K::AP_MODE_TRACK: 
       {
-        snprintf(BufStr, sizeof(BufStr), "%.0f°", (double)N2K::btwSmoothed()); // Bearing to waypoint
-        lv_label_set_text(ui_AutopilotHeading, BufStr);
+        float btw = N2K::btwSmoothed();
+
+        if (!isfinite(btw)) {
+          lv_label_set_text(ui_AutopilotHeading, "---°");
+        } else {
+          snprintf(BufStr, sizeof(BufStr), "%.0f°", (double)btw); // Bearing to waypoint
+          lv_label_set_text(ui_AutopilotHeading, BufStr);
+        }
         lv_obj_add_state(ui_Track, LV_STATE_USER_1);  // detect ap track mode and set button accordingly
         if (lv_obj_has_state(ui_Wind, LV_STATE_USER_1)) lv_obj_clear_state(ui_Wind, LV_STATE_USER_1);// if we are in track clear the other buttons
         if (lv_obj_has_state(ui_Auto, LV_STATE_USER_1)) lv_obj_clear_state(ui_Auto, LV_STATE_USER_1);// if we are in track clear the other buttons
@@ -1147,7 +1177,9 @@ void Do_Update_ScrWind(){
     if (N2K::hasFreshTWS())
         snprintf(BufStr, sizeof(BufStr), "TWS %s%s", ConvertSpeed2UnitSettings(N2K::twsSmoothed(), Unit_Wind), WindUnitStr2);
     else snprintf(BufStr, sizeof(BufStr), "TWS ---%s", WindUnitStr2);
-    lv_label_set_text(ui_TruWindSpeed, BufStr);   
+    lv_label_set_text(ui_TruWindSpeed, BufStr);  
+
+    lv_label_set_text(ui_WindLbl1, WindUnitStr); 
 }
 
 void Do_Update_ScrAppWind() {
@@ -1204,6 +1236,8 @@ void Do_Update_ScrAppWind() {
 
     if (N2K::hasFreshAWS()) lv_label_set_text(ui_AWS, ConvertSpeed2UnitSettings(N2K::awsSmoothed(), Unit_Wind));
       else                  lv_label_set_text(ui_AWS, "---");
+
+    lv_label_set_text(ui_WindLbl3, WindUnitStr); 
 }
 
 void Do_Update_ScrTruWind() {
@@ -1237,13 +1271,15 @@ void Do_Update_ScrTruWind() {
     
     if (N2K::hasFreshTWS()) lv_label_set_text(ui_TWS, ConvertSpeed2UnitSettings(N2K::twsSmoothed(), Unit_Wind));
       else                  lv_label_set_text(ui_TWS, "---");
+
+    lv_label_set_text(ui_WindLbl4, WindUnitStr); 
 }
 
 void Do_Update_ScrNav(){
   char BufStr[64];
   N2K::ApMode mode = N2K::apMode();
 
-  snprintf(BufStr, sizeof(BufStr), "STW:                                     %s", SpeedUnitStr);
+  snprintf(BufStr, sizeof(BufStr), "STW:                                  %s", SpeedUnitStr);
   lv_label_set_text(ui_SpeedLbl1, BufStr);
 
   if (N2K::hasFreshLatitude()) lv_label_set_text(ui_Lat, ConvertPosition2UnitSettings(N2K::latitude(), 'L', Unit_Position));
@@ -1287,9 +1323,9 @@ void Do_Update_ScrNav(){
 void Do_Update_ScrInfo(){
   char BufStr[64];
 
-  snprintf(BufStr, sizeof(BufStr), "Depth:                                  %s", DepthUnitStr);
+  snprintf(BufStr, sizeof(BufStr), "Depth:                                %s", DepthUnitStr);
   lv_label_set_text(ui_DepthLbl, BufStr);
-  snprintf(BufStr, sizeof(BufStr), "SOG:                                     %s", SpeedUnitStr);
+  snprintf(BufStr, sizeof(BufStr), "SOG:                                  %s", SpeedUnitStr);
   lv_label_set_text(ui_SpeedLbl, BufStr);
 
   if (N2K::hasFreshDepth() && (N2K::depth()<=100)  && isfinite(N2K::depth()) )  lv_label_set_text(ui_Depth, ConvertDepth2UnitSettings(N2K::depth(), Unit_Depth));

@@ -64,7 +64,7 @@ void ui_event_Go2SettingScr(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_LONG_PRESSED) {
+    if(event_code == LV_EVENT_RELEASED) {
         DoInitSettingsScr(e);
     }
 }
@@ -108,7 +108,7 @@ void ui_ScrInfo_screen_init(void)
     lv_obj_set_height(ui_DepthLbl, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_DepthLbl, -8);
     lv_obj_set_y(ui_DepthLbl, -11);
-    lv_label_set_text(ui_DepthLbl, "Depth:                                  m");
+    lv_label_set_text(ui_DepthLbl, "Depth:                                m");
     lv_obj_clear_flag(ui_DepthLbl, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
                       LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
@@ -206,7 +206,7 @@ void ui_ScrInfo_screen_init(void)
     lv_obj_set_height(ui_SpeedLbl, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_SpeedLbl, -8);
     lv_obj_set_y(ui_SpeedLbl, -11);
-    lv_label_set_text(ui_SpeedLbl, "SOG:                                     kn");
+    lv_label_set_text(ui_SpeedLbl, "SOG:                                  kn");
     lv_obj_clear_flag(ui_SpeedLbl, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
                       LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
@@ -272,7 +272,7 @@ void ui_ScrInfo_screen_init(void)
     lv_obj_set_width(ui_Label30, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Label30, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_Label30, -8);
-    lv_obj_set_y(ui_Label30, -1);
+    lv_obj_set_y(ui_Label30, -11);
     lv_label_set_text(ui_Label30, "AWA: ");
     lv_obj_clear_flag(ui_Label30, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
                       LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
