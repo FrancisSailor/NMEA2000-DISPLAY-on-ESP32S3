@@ -70,3 +70,11 @@ def DoInitSettingsScr(event_struct):
 def DoSetBacklight(event_struct):
     return
 
+
+def BeepOnce(event_struct):
+    return
+
+
+def CancelUnitSettings(event_struct):
+    return
+

@@ -39,6 +39,7 @@ void ui_init(void)
     ui_img_appwind_png_load();
     ui_img_truewind_png_load();
     ui_img_circularscale_png_load();
+    ui_img_needle2_png_load();
     ui_img_indicator_png_load();
     ui_img_helmman_png_load();
     ui_img_boat_png_load();

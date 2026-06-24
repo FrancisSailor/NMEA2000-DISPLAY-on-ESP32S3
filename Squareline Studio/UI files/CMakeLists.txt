@@ -18,6 +18,7 @@ SET(SOURCES ui_SplashScr.c
     ui_img_appwind_png.c
     ui_img_truewind_png.c
     ui_img_circularscale_png.c
+    ui_img_needle2_png.c
     ui_img_indicator_png.c
     ui_img_helmman_png.c
     ui_img_boat_png.c

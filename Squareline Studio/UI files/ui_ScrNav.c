@@ -213,7 +213,7 @@ void ui_ScrNav_screen_init(void)
     lv_obj_set_height(ui_SpeedLbl1, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_SpeedLbl1, -8);
     lv_obj_set_y(ui_SpeedLbl1, -11);
-    lv_label_set_text(ui_SpeedLbl1, "STW:                                     kn");
+    lv_label_set_text(ui_SpeedLbl1, "STW:                                  kn");
     lv_obj_clear_flag(ui_SpeedLbl1, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
                       LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags

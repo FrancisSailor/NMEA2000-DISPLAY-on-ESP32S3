@@ -37,17 +37,17 @@ extern void ui_event_Wind(lv_event_t * e);
 extern lv_obj_t * ui_Wind;
 extern lv_obj_t * ui_WindLbl;
 extern lv_obj_t * ui_APwindPanel;
-extern lv_obj_t * ui_CircularScale;
-extern lv_obj_t * ui_Image1;
 extern lv_obj_t * ui_Label21;
+extern lv_obj_t * ui_Image1;
+extern lv_obj_t * ui_Needle;
 extern lv_obj_t * ui_APheadingPanel;
 extern lv_obj_t * ui_Compass;
 extern lv_obj_t * ui_Image3;
 extern lv_obj_t * ui_Label22;
-extern lv_obj_t * ui_Heading1;
 extern lv_obj_t * ui_APmode;
 extern lv_obj_t * ui_AutopilotHeading;
 extern lv_obj_t * ui_Rudder2;
+extern lv_obj_t * ui_Heading1;
 // CUSTOM VARIABLES
 extern lv_obj_t * ui_ScrAutopilot;
 extern lv_obj_t * ui_Minus1;
@@ -59,13 +59,13 @@ extern lv_obj_t * ui_Track;
 extern lv_obj_t * ui_Wind;
 extern lv_obj_t * ui_WindLbl;
 extern lv_obj_t * ui_APwindPanel;
-extern lv_obj_t * ui_CircularScale;
+extern lv_obj_t * ui_Needle;
 extern lv_obj_t * ui_APheadingPanel;
 extern lv_obj_t * ui_Compass;
-extern lv_obj_t * ui_Heading1;
 extern lv_obj_t * ui_APmode;
 extern lv_obj_t * ui_AutopilotHeading;
 extern lv_obj_t * ui_Rudder2;
+extern lv_obj_t * ui_Heading1;
 
 #ifdef __cplusplus
 } /*extern "C"*/

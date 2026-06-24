@@ -18,6 +18,7 @@ ui_img_compass2_png.c
 ui_img_appwind_png.c
 ui_img_truewind_png.c
 ui_img_circularscale_png.c
+ui_img_needle2_png.c
 ui_img_indicator_png.c
 ui_img_helmman_png.c
 ui_img_boat_png.c

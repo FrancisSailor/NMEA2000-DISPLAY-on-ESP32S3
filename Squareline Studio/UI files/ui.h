@@ -47,6 +47,8 @@ extern lv_img_dsc_t ui_img_truewind_png;   // assets/TrueWind.png
 void ui_img_truewind_png_load();
 extern lv_img_dsc_t ui_img_circularscale_png;   // assets/circularscale.png
 void ui_img_circularscale_png_load();
+extern lv_img_dsc_t ui_img_needle2_png;   // assets/Needle2.png
+void ui_img_needle2_png_load();
 extern lv_img_dsc_t ui_img_indicator_png;   // assets/Indicator.png
 void ui_img_indicator_png_load();
 extern lv_img_dsc_t ui_img_helmman_png;   // assets/HelmMan.png

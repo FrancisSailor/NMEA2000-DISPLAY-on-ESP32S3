@@ -163,10 +163,10 @@ void setup() {
     vTaskDelay(100);
     Beep();
 
-//    pinMode(STARTUP_RESET_GPIO, INPUT);  // if you have a modded board uncomment this
+    //pinMode(STARTUP_RESET_GPIO, INPUT);  // if you have a modded board uncomment this
     Serial.begin(115200);
     vTaskDelay(100);
-//    handleOneShotStartupReset();  // if you have a modded board uncomment this
+    //handleOneShotStartupReset();  // if you have a modded board uncomment this
 
     if (!Rev4Board::Begin()) {
       Serial.println("V4 board init failed");
@@ -194,7 +194,6 @@ void setup() {
       g_ui_update_timer = lv_timer_create(ui_update_timer_cb, 100, NULL); // this sets refresh timing for all screens to display
       Update_Unit_Labels();
       lv_obj_add_state(ui_Track, LV_STATE_DISABLED);
-      lv_arc_set_change_rate (ui_CircularScale,1); // max change is 1 degrees per second
     lvgl_port_unlock(); /* Release the mutex */
     
     // Basic NMEA2000 node setup (talker + listener)
@@ -773,32 +772,46 @@ const char* apModeToStr(N2K::ApMode m){  // helper function
   }
 } 
 
+bool AP_Btns_Enabled() {  // check if the AP mode is in a condition where the AP Buttons can be used +10,+1.-1,-10
+  N2K::ApMode mode = N2K::apMode();
+  if ((mode == N2K::AP_MODE_WIND) || (mode == N2K::AP_MODE_AUTO) || (mode == N2K::AP_MODE_TRACK)) return true;
+  else return false;
+}
+
 void Pilot_min10(lv_event_t * e) { // detect button press of the auto button
   N2K::ApMode mode = N2K::apMode();
-  if (!(mode == N2K::AP_MODE_WIND)) N2K::apMinus10();
-  else                              N2K::apPlus10();
-  Beep();
+  if (AP_Btns_Enabled()) {
+    if (!(mode == N2K::AP_MODE_WIND)) N2K::apMinus10();
+    else                              N2K::apPlus10();
+    Beep();
+  }
 }
 
 void Pilot_min1(lv_event_t * e) { // detect button press of the auto button
   N2K::ApMode mode = N2K::apMode();
-  if (!(mode == N2K::AP_MODE_WIND)) N2K::apMinus1();
-  else                              N2K::apPlus1();
-  Beep();
+  if (AP_Btns_Enabled()) {
+    if (!(mode == N2K::AP_MODE_WIND)) N2K::apMinus1();
+    else                              N2K::apPlus1();
+    Beep();
+  }
 }
 
 void Pilot_plus10(lv_event_t * e) { // detect button press of the auto button
   N2K::ApMode mode = N2K::apMode();
-  if (!(mode == N2K::AP_MODE_WIND)) N2K::apPlus10();
-  else                              N2K::apMinus10();
-  Beep();
+  if (AP_Btns_Enabled()) {
+    if (!(mode == N2K::AP_MODE_WIND)) N2K::apPlus10();
+    else                              N2K::apMinus10();
+    Beep();
+  }
 }
 
 void Pilot_plus1(lv_event_t * e) { // detect button press of the auto button
   N2K::ApMode mode = N2K::apMode();
-  if (!(mode == N2K::AP_MODE_WIND)) N2K::apPlus1();
-  else                              N2K::apMinus1();
-  Beep();
+  if (AP_Btns_Enabled()) {
+    if (!(mode == N2K::AP_MODE_WIND)) N2K::apPlus1();
+    else                              N2K::apMinus1();
+    Beep();
+  }
 }
 
 void Auto_pressed(lv_event_t * e) { // detect button press of the auto button
@@ -1035,6 +1048,7 @@ void DialogCancel(lv_event_t * e) { // detect button press of the cancel button 
 
 void Do_Update_ScrAutopilot(){
   char BufStr[32];
+  int Buf;
   const char* Tack;
   float Windangle;
 
@@ -1090,16 +1104,12 @@ void Do_Update_ScrAutopilot(){
           lv_label_set_text(ui_AutopilotHeading, BufStr);
         }
         
-        Windangle = N2K::awaSmoothed();
-        if (Windangle > 180) {
-          Windangle = Windangle -360;
-          lv_obj_set_style_arc_color(ui_CircularScale, lv_color_hex(0xFF0000), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        if (N2K::hasFreshAWA()){
+          Buf = 10 * N2K::awaSmoothed();
+          lv_img_set_angle(ui_Needle, Buf);  // for normal wind panel
+        } else {
+          lv_img_set_angle(ui_Needle, 0);  // for normal wind panel
         }
-        else
-          lv_obj_set_style_arc_color(ui_CircularScale, lv_color_hex(0x00FF00), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-
-        if (N2K::hasFreshAWA()) lv_arc_set_value(ui_CircularScale, Windangle);
-          else                  lv_arc_set_value(ui_CircularScale, 0);
         lv_obj_add_state(ui_Wind, LV_STATE_USER_1); // detect ap wind mode and set button accordingly
         if (lv_obj_has_state(ui_Track, LV_STATE_USER_1)) lv_obj_clear_state(ui_Track, LV_STATE_USER_1); // if we are in wind clear the other buttons
         if (lv_obj_has_state(ui_Auto, LV_STATE_USER_1))  lv_obj_clear_state(ui_Auto, LV_STATE_USER_1); // if we are in wind clear the other buttons
